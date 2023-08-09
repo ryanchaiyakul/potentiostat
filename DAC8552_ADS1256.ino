@@ -60,13 +60,13 @@ int trueEndMV = endMV - amptitude;
 int32_t ofc;
 uint32_t fsc;
 
-// Timer Variables
-unsigned long get_time;
-unsigned long ini_time;
-int idx;
-int baseMV;
-int outputMV;
-int k = 0;
+// ISR Variables
+unsigned long ini_time;  // start of experiment
+int idx;                 // the # of 10ms intervals since start
+uint8_t k = 0;           // counter to sample every 3 ISR calls
+
+// Outputs
+int outputMV;  // set to WE-RE when setV_f is switched to true
 
 // Trigger Flags
 bool setV_f = false;
@@ -76,14 +76,11 @@ bool end_f = false;
 // State Machine
 enum states {
   IDLE,
-  DPV,
-  END,  // Debug
+  QUIET,
+  ACTIVE,
 } state = IDLE;
 
-enum dpvStates {
-  DPV_QUIET,
-  DPV_ACTIVE,
-} dpvState = DPV_QUIET;
+void (*funcISR)(void);
 
 // DPV Variables
 int count;
@@ -108,8 +105,11 @@ void setup() {
   setVoltage_B(2.0);  //Set voltage (channel B) == 2.0V
   initADS();
 
-  //get initial time
+  // Get initial time
   timer_init();  // Init Timer to 3000Hz
+
+  // Default DPV
+  funcISR = updateDPV;
 }
 
 /**
@@ -120,57 +120,81 @@ void setup() {
 void loop() {
   switch (state) {
     case IDLE:
-      delay(500);
-      // currently automatically go into DPV
-      state = DPV;
-      count = cycles;
-      resetDPV();
-      break;
-    case END:
-      break;
-    case DPV:
-      switch (dpvState) {
-        case DPV_QUIET:
-          // Wait until quiet time has passed
-          if (micros() - ini_time > quietTime) {
-            dpvState = DPV_ACTIVE;
-            ini_time += quietTime;  // offset ini_time for ISR
-          }
-          break;
-        case DPV_ACTIVE:
-          // IF setV_f is true, set voltage (channel A) so Working - Reference = outputMV
-          if (setV_f == true) {
-            setVoltage_A((2000.0 - outputMV) / 1000.0 - AmpOffset);
-            setV_f = false;
-          }
+      if (Serial.available()) {
+        String serialValue = Serial.readString();
+        if (serialValue.length() == 2) {
+          switch (serialValue.charAt(0)) {
+              case 's':
+              case 'S':
+                state = QUIET;
+                count = cycles;
 
-          // IF sampleV_f is true, read from ADC and send on Serial.print()
-          if (sampleV_f == true) {
-            int32_t results = (read_Value() >> 8) << 8;
-            Serial.println(results);  // Clear last 8 bits b/c noisy
-            sampleV_f = false;
-          }
-          if (end_f == true) {
-            resetDPV();
-            --count <= 0 ? state = END : Serial.println("~");  // Continue to DPV_QUIET if still cycles remaining
-          }
-          break;
+                // Print callibration before experiment
+                Serial.print(ofc);
+                Serial.print(",");
+                Serial.println(fsc);
+                reset();
+                break;
+            }
+        } else {
+
+        }
+      }
+      break;
+    case QUIET:
+      if (micros() - ini_time > quietTime) {
+        state = ACTIVE;
+        ini_time += quietTime;  // offset ini_time for ISR
+      }
+      break;
+    case ACTIVE:
+      // IF setV_f is true, set voltage (channel A) so WE-RE=outputMV
+      if (setV_f == true) {
+        setVoltage_A((2000.0 - outputMV) / 1000.0 - AmpOffset);
+        setV_f = false;
+      }
+
+      // IF sampleV_f is true, read from ADC and send on Serial.print()
+      if (sampleV_f == true) {
+        int32_t results = (read_Value() >> 8) << 8;
+        Serial.println(results);  // Clear last 8 bits b/c noisy
+        sampleV_f = false;
+      }
+      if (end_f == true) {
+        reset();
+        --count <= 0 ? state = IDLE : Serial.println("~");  // Continue to QUIET if still cycles remaining
       }
       break;
   }
 }
 
-void resetDPV() {
-  dpvState = DPV_QUIET;
+void reset() {
+  state = QUIET;
   setV_f = false;
+  sampleV_f = false;
   end_f = false;
   setVoltage_A((2000.0 - startMV) / 1000.0 - AmpOffset);
   ini_time = micros();
 }
 
+/**
+ * funcISR
+ * 
+ * Called at 3000 Hz
+ *
+ * Avaliable variables:
+ *
+ * idx = # of 10ms intervals since start
+ *
+ * Outputs:
+ *
+ * setV_f = update to outputMV
+ * endV_f = signifies end of experiment
+ * outputMV = WE-RE in mV
+ */
+
 void updateDPV() {
-  idx = get_time / sampleWidthUS;                      // segments time into 10ms intervals
-  baseMV = trueStartMV + incrE * (idx / pulseLength);  // (idx / pulseLength) = current pulse #
+  int baseMV = trueStartMV + incrE * (idx / pulseLength);  // (idx / pulseLength) = current pulse #
 
   // "Low" from [0, pulseStart); "High" from [pulseStart, pulseLength)
   if (idx % pulseLength == pulseStart) {
@@ -180,12 +204,6 @@ void updateDPV() {
     outputMV = baseMV;
     setV_f = true;
   }
-
-  // Sample Every 3rd Call (1000.0625039065 Hz)
-  if (k == 0) {
-    sampleV_f = true;
-  }
-  k = (k + 1) % 3;
 
   if (baseMV <= trueEndMV) {
     outputMV = endMV;
@@ -213,13 +231,15 @@ void timer_init() {
 }
 
 ISR(TIMER1_COMPA_vect) {  // interrupt service routine
-  get_time = micros() - ini_time;
-  switch (state) {
-    case DPV:
-      if (dpvState == DPV_ACTIVE) updateDPV();
-      break;
-    default:
-      break;
+  unsigned long get_time = micros() - ini_time;
+  idx = get_time / sampleWidthUS;  // segments time into 10ms intervals
+  if (state == ACTIVE) {
+    funcISR();
+    // Sample Every 3rd Call (1000.0625039065 Hz)
+    if (k == 0) {
+      sampleV_f = true;
+    }
+    k = (k + 1) % 3;
   }
 }
 
@@ -281,11 +301,6 @@ void initADS() {
   uint32_t fsc = fs2;                                          // fsc = (fs2 << 16 & 0x00FF0000) | fs1 << 8 | fs0; idk why it breaks?? but it does
   fsc = (fsc << 8) + fs1;
   fsc = (fsc << 8) + fs0;
-
-  // ofc, fsc
-  Serial.print(ofc);
-  Serial.print(",");
-  Serial.println(fsc);
 }
 
 void waitforDRDY() {
