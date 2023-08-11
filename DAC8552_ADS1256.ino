@@ -1,4 +1,5 @@
 #include <SPI.h>
+#include <ArduinoJson.h>
 
 // SPI Speeds
 #define ADC_SPEED 1000000
@@ -31,30 +32,75 @@
 #define AmpOffset 0          // 0.103v
 #define sampleWidthUS 10000  // 10ms granularity
 
+// JSON Constants
+#define CAPACITY 10 * JSON_OBJECT_SIZE(1)  // Roughly 10 fields
+
+// State Machine
+
+// Potentiometer States
+#define IDLE 0
+#define QUIET 1
+#define ACTIVE 2
+#define RELAX 3
+
 // DPV Setting Sources (And Electrochemical Workstation)
 // https://pineresearch.com/shop/kb/software/methods-and-techniques/voltammetric-methods/differential-pulse-voltammetry-dpv/
 
 // DPV Settings
 
 // All in mV
-int startMV = -100;  // 100mv
-int endMV = -450;    // 600mv
-int incrE = -5;
-int amptitude = 50;
+int dpvStartMV = -100;  // 100mv
+int dpvEndMV = -450;    // 600mv
+int dpvIncrE = 5;       // Sign calculated later
+int dpvAmplitude = 50;
 
 // 10ms granularity (us)
-unsigned long pulseWidth = 100000;
-unsigned long pulsePeriod = 500000;  // Includes pulse
-unsigned long quietTime = 2000000;   // Hold reference at startMV for x us
-
-int cycles = 1;  // number of cycles (cycles separated by "~\n")
+unsigned long dpvPulseWidth = 100000;
+unsigned long dpvPulsePeriod = 500000;  // Includes pulse
+unsigned long dpvQuietTime = 2000000;   // Hold reference at dpvTrueStartMV for x us
+unsigned long dpvRelaxTime = 2000000;   // Hold reference at dpvTrueEndMV for x us
 
 // DPV Variables
-int pulseStart = (pulsePeriod - pulseWidth) / sampleWidthUS;
-int pulseLength = pulsePeriod / sampleWidthUS;
+int dpvPulseStart;
+int dpvPulseLength;
+int trueDpvStartMV;
+int trueDpvEndMV;
+int trueDpvIncrE;
 
-int trueStartMV = startMV - amptitude;  // Offset as measuring by peaks
-int trueEndMV = endMV - amptitude;
+bool dpvIsForward;
+
+// SWV Setting Sources
+// https://pineresearch.com/shop/kb/software/methods-and-techniques/voltammetric-methods/square-wave-voltammetry/
+
+// SWV Settings
+
+// All in mV
+int swvStartMV = 0;  // 100mv
+int swvVerticesMVs[20] = {100, -100, 100};
+int swvEndMV = -50;  // 600mv
+int swvIncrE = 5;
+int swvAmplitude = 5;
+
+int swvVertices = 3;
+  
+// 10ms granularity (us)
+unsigned long swvPulsePeriod = 500000;  // Even number
+unsigned long swvQuietTime = 2000000;   // Hold reference at swvTrueStartMV for x us
+unsigned long swvRelaxTime = 2000000;   // Hold reference at swvTrueEndMV for x us
+
+// SWV Variables
+int swvPulseCenter;
+int swvPulseLength;
+int trueSwvStartMV;
+int trueSwvEndMV;
+int trueSwvIncrE;
+
+int8_t swvIsForward;
+bool swvFinishedVertices;
+int swvCount;
+int swvBreakMV;
+int swvNewStartMV;
+int trueSwvVerticesMVs[20];
 
 // ADC Callibration
 int32_t ofc;
@@ -63,27 +109,28 @@ uint32_t fsc;
 // ISR Variables
 unsigned long ini_time;  // start of experiment
 int idx;                 // the # of 10ms intervals since start
-uint8_t k = 0;           // counter to sample every 3 ISR calls
+uint8_t k = 0;                    // counter to sample every 3 ISR calls
+void (*funcISR)(void);            // function called at 3000 Hz (Specific to voltammetry)
+int baseMV;                       // static variable to avoid creating a variable every cycle
 
 // Outputs
 int outputMV;  // set to WE-RE when setV_f is switched to true
 
+// Loop variables
+int startMV;    // quietTime mV
+int endMV;      // relaxTime mV
+unsigned long quietTime;  // set to quietTime for respective mode
+unsigned long relaxTime;  // set to relaxTime for respective mode
+
 // Trigger Flags
 bool setV_f = false;
-bool sampleV_f = false;
+bool volatile sampleV_f = false;
 bool end_f = false;
 
-// State Machine
-enum states {
-  IDLE,
-  QUIET,
-  ACTIVE,
-} state = IDLE;
+int8_t state = IDLE;
 
-void (*funcISR)(void);
-
-// DPV Variables
-int count;
+// Debug
+unsigned long start_time;
 
 void setup() {
   Serial.begin(BAUD_RATE);
@@ -109,7 +156,7 @@ void setup() {
   timer_init();  // Init Timer to 3000Hz
 
   // Default DPV
-  funcISR = updateDPV;
+  selectDPV();
 }
 
 /**
@@ -124,20 +171,26 @@ void loop() {
         String serialValue = Serial.readString();
         if (serialValue.length() == 2) {
           switch (serialValue.charAt(0)) {
-              case 's':
-              case 'S':
-                state = QUIET;
-                count = cycles;
-
-                // Print callibration before experiment
-                Serial.print(ofc);
-                Serial.print(",");
-                Serial.println(fsc);
-                reset();
-                break;
-            }
-        } else {
-
+            case 'b':
+            case 'B':
+              state = QUIET;
+              start_time = micros();
+              //printCallibration();
+              reset(startMV);
+              break;
+            case 'd':
+            case 'D':
+              selectDPV();
+              break;
+            case 's':
+            case 'S':
+              selectSWV();
+              break;
+            case 'c':
+            case 'C':
+              callibrateADS();
+              break;
+          }
         }
       }
       break;
@@ -148,6 +201,9 @@ void loop() {
       }
       break;
     case ACTIVE:
+      unsigned long get_time = micros() - ini_time;
+      idx = get_time / sampleWidthUS;  // segments time into 10ms intervals
+      funcISR();
       // IF setV_f is true, set voltage (channel A) so WE-RE=outputMV
       if (setV_f == true) {
         setVoltage_A((2000.0 - outputMV) / 1000.0 - AmpOffset);
@@ -156,58 +212,163 @@ void loop() {
 
       // IF sampleV_f is true, read from ADC and send on Serial.print()
       if (sampleV_f == true) {
-        int32_t results = (read_Value() >> 8) << 8;
-        Serial.println(results);  // Clear last 8 bits b/c noisy
+        int32_t results = (read_Value() >> 8) << 8;  // Clear last 8 bits b/c noisy
+        //Serial.println(results);
         sampleV_f = false;
       }
       if (end_f == true) {
-        reset();
-        --count <= 0 ? state = IDLE : Serial.println("~");  // Continue to QUIET if still cycles remaining
+        reset(endMV);
+        state = RELAX;
+      }
+      break;
+    case RELAX:
+      if (micros() - ini_time > relaxTime) {
+        state = IDLE;
       }
       break;
   }
 }
 
-void reset() {
+void reset(float voltage) {
   state = QUIET;
   setV_f = false;
   sampleV_f = false;
   end_f = false;
-  setVoltage_A((2000.0 - startMV) / 1000.0 - AmpOffset);
+  setVoltage_A((2000.0 - voltage) / 1000.0 - AmpOffset);
   ini_time = micros();
+
+  if (trueSwvStartMV < trueSwvVerticesMVs[0]) {
+    swvIsForward = true;
+  } else {
+    swvIsForward = false;
+  }
+  swvFinishedVertices = false;
+  swvBreakMV = trueSwvVerticesMVs[0];
+  swvNewStartMV = trueSwvStartMV;
+  swvCount = 0;
+}
+
+void selectDPV() {
+  // Update Variables
+  dpvPulseStart = (dpvPulsePeriod - dpvPulseWidth) / sampleWidthUS;
+  dpvPulseLength = dpvPulsePeriod / sampleWidthUS;
+
+  trueDpvStartMV = dpvStartMV - dpvAmplitude;
+  trueDpvEndMV = dpvEndMV - dpvAmplitude;
+
+  trueDpvIncrE = dpvIncrE < 0 ? -dpvIncrE : dpvIncrE;
+  if (trueDpvEndMV < trueDpvStartMV) {
+    trueDpvIncrE *= -1;
+    dpvIsForward = false;
+  } else {
+    dpvIsForward = true;
+  }
+
+  startMV = trueDpvStartMV;
+  endMV = trueDpvEndMV;
+  quietTime = dpvQuietTime;
+  relaxTime = dpvRelaxTime;
+  funcISR = updateDPV;
+}
+
+void selectSWV() {
+  // Update Variables
+  swvPulseCenter = (swvPulsePeriod / 2) / sampleWidthUS;
+  swvPulseLength = swvPulsePeriod / sampleWidthUS;
+
+  trueSwvStartMV = swvStartMV - swvAmplitude;
+  for (int i = 0; i < swvVertices; i++) {
+    trueSwvVerticesMVs[i] = swvVerticesMVs[i] - swvAmplitude;
+  }
+  trueSwvEndMV = swvEndMV - swvAmplitude;
+
+  trueSwvIncrE = swvIncrE < 0 ? -swvIncrE : swvIncrE;
+
+  if (trueSwvStartMV < trueSwvVerticesMVs[0]) {
+    swvIsForward = true;
+  } else {
+    swvIsForward = false;
+  }
+  swvFinishedVertices = false;
+  swvBreakMV = trueSwvVerticesMVs[0];
+  swvNewStartMV = trueSwvStartMV;
+
+  startMV = trueSwvStartMV;
+  endMV = trueSwvEndMV;
+  quietTime = swvQuietTime;
+  relaxTime = swvRelaxTime;
+  funcISR = updateSWV;
 }
 
 /**
- * funcISR
- * 
- * Called at 3000 Hz
- *
- * Avaliable variables:
- *
- * idx = # of 10ms intervals since start
- *
- * Outputs:
- *
- * setV_f = update to outputMV
- * endV_f = signifies end of experiment
- * outputMV = WE-RE in mV
- */
+   funcISR
+
+   Called at 3000 Hz
+
+   Avaliable variables:
+
+   idx = # of 10ms intervals since start
+
+   Outputs:
+
+   setV_f = update to outputMV
+   endV_f = signifies end of experiment
+   outputMV = WE-RE in mV
+*/
 
 void updateDPV() {
-  int baseMV = trueStartMV + incrE * (idx / pulseLength);  // (idx / pulseLength) = current pulse #
+  baseMV = trueDpvStartMV + trueDpvIncrE * (idx / dpvPulseLength);  // (idx / dpvPulseLength) = current pulse #
 
-  // "Low" from [0, pulseStart); "High" from [pulseStart, pulseLength)
-  if (idx % pulseLength == pulseStart) {
-    outputMV = baseMV + amptitude;
+  // "Low" from [0, dpvPulseStart); "High" from [dpvPulseStart, dpvPulseLength)
+  int remainder = idx % dpvPulseLength;
+  if (remainder == dpvPulseStart) {
+    outputMV = baseMV + dpvAmplitude;
     setV_f = true;
-  } else if (idx % pulseLength == 0) {
+  } else if (remainder == 0) {
     outputMV = baseMV;
     setV_f = true;
   }
 
-  if (baseMV <= trueEndMV) {
-    outputMV = endMV;
+  if ((dpvIsForward && baseMV > trueDpvEndMV) || (!dpvIsForward && baseMV < trueDpvEndMV)) {
+    outputMV = trueDpvEndMV;
     end_f = true;
+  }
+}
+
+void updateSWV() {
+  baseMV = swvNewStartMV;
+  // ini_time is reset once the vertex is reached so no need to account for that
+  if (swvIsForward) {
+    baseMV += trueSwvIncrE * (idx / swvPulseLength);
+  } else {
+    baseMV -= trueSwvIncrE * (idx / swvPulseLength);
+  }
+
+  int remainder = idx % swvPulseLength;
+  if (remainder == swvPulseCenter) {
+    outputMV = baseMV - swvAmplitude;
+    setV_f = true;
+  } else if (remainder == 0) {
+    outputMV = baseMV + swvAmplitude;
+    setV_f = true;
+  }
+
+  if (swvFinishedVertices) {
+    if ((swvIsForward && baseMV > trueSwvEndMV) || (!swvIsForward && baseMV < trueSwvEndMV)) {
+      outputMV = trueSwvEndMV;
+      end_f = true;
+    }
+  } else {
+    if ((swvIsForward && baseMV >= swvBreakMV) || (!swvIsForward && baseMV <= swvBreakMV)) {
+      swvIsForward = !swvIsForward;
+      swvNewStartMV = swvBreakMV;
+      if (++swvCount == swvVertices) {
+        swvFinishedVertices = true;
+      } else {
+        swvBreakMV = trueSwvVerticesMVs[swvCount];
+      }
+      ini_time = micros();
+    }
   }
 }
 
@@ -231,16 +392,11 @@ void timer_init() {
 }
 
 ISR(TIMER1_COMPA_vect) {  // interrupt service routine
-  unsigned long get_time = micros() - ini_time;
-  idx = get_time / sampleWidthUS;  // segments time into 10ms intervals
-  if (state == ACTIVE) {
-    funcISR();
-    // Sample Every 3rd Call (1000.0625039065 Hz)
-    if (k == 0) {
-      sampleV_f = true;
-    }
-    k = (k + 1) % 3;
+  // Sample Every 3rd Call (1000.0625039065 Hz)
+  if (k == 0) {
+    sampleV_f = true;
   }
+  k = (k + 1) % 3;
 }
 
 // DAC
@@ -248,6 +404,7 @@ ISR(TIMER1_COMPA_vect) {  // interrupt service routine
 void setVoltage_A(float voltage) {
   uint16_t data = Voltage_Convert(voltage);
   DAC_WR(WR_LOAD_A, data);
+  sendDACCSV(voltage);
 }
 
 void setVoltage_B(float voltage) {
@@ -282,10 +439,15 @@ void initADS() {
   // ADS Settings
   adc_WR8(0x01, 0x01);  // AIN0-AIN1
   adc_WR8(0x00, 0x32);  // Enable Buffer
-  adc_WR8(0x02, 0x04);  // PGA=16
+  adc_WR8(0x02, 0x03);  // PGA=8
+  //adc_WR8(0x02, 0x04);  // PGA=16
   adc_WR8(0x03, 0xC0);  // DRATE=3,750SPS
   delay(100);           // settling time: 3750SPS needs 0.44ms
 
+  callibrateADS();
+}
+
+void callibrateADS() {
   adcSendCMD(CALLIBRATE);  //send the calibration command
   delay(10);
 
@@ -297,10 +459,16 @@ void initADS() {
   uint8_t fs1 = adc_RD8(0x09);
   uint8_t fs2 = adc_RD8(0x0A);
 
-  int32_t ofc = (off2 << 16 & 0x00FF0000) | off1 << 8 | off0;  // already sign-extends from 24 bits
-  uint32_t fsc = fs2;                                          // fsc = (fs2 << 16 & 0x00FF0000) | fs1 << 8 | fs0; idk why it breaks?? but it does
+  ofc = (off2 << 16 & 0x00FF0000) | off1 << 8 | off0;  // already sign-extends from 24 bits
+  fsc = fs2;                                           // fsc = (fs2 << 16 & 0x00FF0000) | fs1 << 8 | fs0; idk why it breaks?? but it does
   fsc = (fsc << 8) + fs1;
   fsc = (fsc << 8) + fs0;
+}
+
+void printCallibration() {
+  Serial.print(ofc);
+  Serial.print(",");
+  Serial.println(fsc);
 }
 
 void waitforDRDY() {
@@ -369,13 +537,13 @@ void adcSendCMD(uint8_t cmd) {
 
 // DEBUGGING
 
-/**
-  void sendDACCSV(float voltage) {
+
+void sendDACCSV(float voltage) {
   Serial.print(micros() - start_time);
   Serial.print(",");
   Serial.println(voltage, 4);
-  }
-*/
+}
+
 
 /**
   void adcSendCSV(int32_t result) {
