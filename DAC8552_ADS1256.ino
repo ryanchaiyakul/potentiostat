@@ -30,7 +30,7 @@
 // DAC Constants
 #define RefDACMV 3301        // 5v
 #define AmpOffset 0          // 0.103v
-#define sampleWidthUS 10000  // 10ms granularity
+#define sampleWidthUS 10000  // 1ms granularity
 
 // JSON Constants
 #define CAPACITY 10 * JSON_OBJECT_SIZE(1)  // Roughly 10 fields
@@ -75,14 +75,14 @@ bool dpvIsForward;
 // SWV Settings
 
 // All in mV
-int swvStartMV = 0;  // 100mv
-int swvVerticesMVs[20] = {100, -100, 100};
-int swvEndMV = -50;  // 600mv
-int swvIncrE = 5;
-int swvAmplitude = 5;
+int swvStartMV = 1000;  // 100mv
+int swvVerticesMVs[20] = { 0 };
+int swvEndMV = 1000;  // 600mv
+int swvIncrE = 2;
+int swvAmplitude = 25;
 
-int swvVertices = 3;
-  
+int swvVertices = 1;
+
 // 10ms granularity (us)
 unsigned long swvPulsePeriod = 500000;  // Even number
 unsigned long swvQuietTime = 2000000;   // Hold reference at swvTrueStartMV for x us
@@ -109,16 +109,16 @@ uint32_t fsc;
 // ISR Variables
 unsigned long ini_time;  // start of experiment
 int idx;                 // the # of 10ms intervals since start
-uint8_t k = 0;                    // counter to sample every 3 ISR calls
-void (*funcISR)(void);            // function called at 3000 Hz (Specific to voltammetry)
-int baseMV;                       // static variable to avoid creating a variable every cycle
+uint8_t k = 0;           // counter to sample every 3 ISR calls
+void (*funcISR)(void);   // function called at 3000 Hz (Specific to voltammetry)
+int baseMV;              // static variable to avoid creating a variable every cycle
 
 // Outputs
 int outputMV;  // set to WE-RE when setV_f is switched to true
 
 // Loop variables
-int startMV;    // quietTime mV
-int endMV;      // relaxTime mV
+int startMV;              // quietTime mV
+int endMV;                // relaxTime mV
 unsigned long quietTime;  // set to quietTime for respective mode
 unsigned long relaxTime;  // set to relaxTime for respective mode
 
@@ -162,7 +162,7 @@ void setup() {
 /**
    DO NOT MODIFY
 
-   Change DPV Settings above (or in Serial)
+   Change DPV/SWV Settings above (or in Serial)
 */
 void loop() {
   switch (state) {
@@ -213,7 +213,7 @@ void loop() {
       // IF sampleV_f is true, read from ADC and send on Serial.print()
       if (sampleV_f == true) {
         int32_t results = (read_Value() >> 8) << 8;  // Clear last 8 bits b/c noisy
-        //Serial.println(results);
+        Serial.println(results);
         sampleV_f = false;
       }
       if (end_f == true) {
@@ -302,8 +302,6 @@ void selectSWV() {
 
 /**
    funcISR
-
-   Called at 3000 Hz
 
    Avaliable variables:
 
@@ -404,7 +402,7 @@ ISR(TIMER1_COMPA_vect) {  // interrupt service routine
 void setVoltage_A(float voltage) {
   uint16_t data = Voltage_Convert(voltage);
   DAC_WR(WR_LOAD_A, data);
-  sendDACCSV(voltage);
+  //sendDACCSV(voltage);
 }
 
 void setVoltage_B(float voltage) {
