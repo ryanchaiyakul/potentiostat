@@ -33,7 +33,7 @@
 #define sampleWidthUS 10000  // 1ms granularity
 
 // JSON Constants
-#define CAPACITY 10 * JSON_OBJECT_SIZE(1)  // Roughly 10 fields
+#define CAPACITY 400  // Roughly 10 fields
 
 // State Machine
 
@@ -84,9 +84,11 @@ int swvAmplitude = 25;
 int swvVertices = 1;
 
 // 10ms granularity (us)
-unsigned long swvPulsePeriod = 500000;  // Even number
-unsigned long swvQuietTime = 2000000;   // Hold reference at swvTrueStartMV for x us
-unsigned long swvRelaxTime = 2000000;   // Hold reference at swvTrueEndMV for x us
+unsigned long swvFrequency = 100;      // Hz >= 1000 Hz
+unsigned long swvQuietTime = 2000000;  // Hold reference at swvTrueStartMV for x us
+unsigned long swvRelaxTime = 2000000;  // Hold reference at swvTrueEndMV for x us
+
+unsigned long swvPulsePeriod = (1.0 / swvFrequency) * 1000000;
 
 // SWV Variables
 int swvPulseCenter;
@@ -107,30 +109,38 @@ int32_t ofc;
 uint32_t fsc;
 
 // ISR Variables
-unsigned long ini_time;  // start of experiment
-int idx;                 // the # of 10ms intervals since start
-uint8_t k = 0;           // counter to sample every 3 ISR calls
-void (*funcISR)(void);   // function called at 3000 Hz (Specific to voltammetry)
-int baseMV;              // static variable to avoid creating a variable every cycle
-
-// Outputs
-int outputMV;  // set to WE-RE when setV_f is switched to true
+uint8_t k = 0;                    // counter to sample at 4000 Hz (30,000 SPS)
+bool volatile sampleV_f = false;  // tells loop() to initiate ADS read
+bool volatile updateV_f = false;  // tells loop() to check if idx has changed
 
 // Loop variables
-int startMV;              // quietTime mV
-int endMV;                // relaxTime mV
-unsigned long quietTime;  // set to quietTime for respective mode
-unsigned long relaxTime;  // set to relaxTime for respective mode
+unsigned long ini_time;  // start of experiment
+int prev_idx;            // Compared with idx to call onUpdate
+int state = IDLE;        // int that correlates with states
+char serialValue[200];
 
-// Trigger Flags
-bool setV_f = false;
-bool volatile sampleV_f = false;
-bool end_f = false;
+unsigned long quietTime;    // set to quietTime for respective mode
+unsigned long relaxTime;    // set to relaxTime for respective mode
+int startMV;                // quietTime mV
+int endMV;                  // relaxTime mV
+void (*customReset)(void);  // set to reset method for respective mode
+void (*onUpdate)(void);     // function called when idx changes
 
-int8_t state = IDLE;
+// onUpdate variables
+
+int idx;              // the # of 1ms intervals since start (ONLY READ IN onUpdate)
+int baseMV;           // static variable to avoid creating a variable every cycle
+int outputMV;         // set to WE-RE when setV_f is switched to true
+bool setV_f = false;  // set to true when outputMV changes
+bool end_f = false;   // set to true when experiment ends
 
 // Debug
+bool debug_f = false;
 unsigned long start_time;
+
+// JSON
+StaticJsonDocument<CAPACITY> settings;
+JsonArray verticesV;
 
 void setup() {
   Serial.begin(BAUD_RATE);
@@ -157,6 +167,7 @@ void setup() {
 
   // Default DPV
   selectDPV();
+  Serial.println("Initialized");
 }
 
 /**
@@ -168,9 +179,11 @@ void loop() {
   switch (state) {
     case IDLE:
       if (Serial.available()) {
-        String serialValue = Serial.readString();
-        if (serialValue.length() == 2) {
-          switch (serialValue.charAt(0)) {
+        serialValue[Serial.readBytesUntil('\n', serialValue, 200)] = '\0';
+        if (serialValue[1]=='\0') {
+          // Single character corrresponds with a command
+          switch (serialValue[0]) {
+            // Begin experiment
             case 'b':
             case 'B':
               state = QUIET;
@@ -178,17 +191,106 @@ void loop() {
               //printCallibration();
               reset(startMV);
               break;
+            // DPV mode
             case 'd':
             case 'D':
+              Serial.println("DPV Selected");
               selectDPV();
+              break;
+            // SWV mode
+            case 's':
+            case 'S':
+            Serial.println("SWV Selected");
+              selectSWV();
+              break;
+            // CallibrateADS
+            case 'c':
+            case 'C':
+              Serial.println("Callibrated ADS");
+              callibrateADS();
+              break;
+            case 'h':
+            case 'H':
+              Serial.println("{ \"method\": \"d\", \"startV\": 0.0, \"endV\": 0.0, \"incrE\": 0.0, \"amplitude\": 0.0, \"pulseWidth\": 0.0, \"pulsePeriod\": 0.0 }");
+              Serial.println("{ \"method\": \"s\", \"startV\": 0.0, \"verticesV\": [0.0, 0.0], \"endV\": 0.0, \"incrE\": 0.0, \"amplitude\": 0.0, \"frequency\": 0 }");
+              break;
+            default:
+              break;     
+          }
+        } else {
+          /**
+          Setting Formats:
+
+          Newline sensitive
+          Units are in volts, seconds, and Hz
+
+          DPV:
+          { "method": "d", "startV": 0.0, "endV": 0.0, "incrE": 0.0, "amplitude": 0.0, "pulseWidth": 0.0, "pulsePeriod": 0.0 }
+
+          SWV:
+          { "method": "s", "startV": 0.0, "verticesV": [0.0, 0.0], "endV": 0.0, "incrE": 0.0, "amplitude": 0.0, "frequency": 0 }
+          */
+          DeserializationError error = deserializeJson(settings, serialValue);
+          if (error) {
+            Serial.println(error.f_str());
+            return;
+          }
+          switch (*settings["method"].as<const char*>()) {
+            case 'd':
+            case 'D':
+              dpvStartMV = vToMV(settings["startV"].as<float>());
+              dpvEndMV = vToMV(settings["endV"].as<float>());
+              dpvIncrE = vToMV(settings["incrE"].as<float>());
+              dpvAmplitude = vToMV(settings["amplitude"].as<float>());
+              dpvPulseWidth = sToUS(settings["pulseWidth"].as<float>());
+              dpvPulsePeriod = sToUS(settings["pulsePeriod"].as<float>());
+              loadDPV();
+              
+              Serial.print("startMV: ");
+              Serial.println(dpvStartMV);
+              Serial.print("endMV: ");
+              Serial.println(dpvEndMV);
+              Serial.print("incrE: ");
+              Serial.println(dpvIncrE);
+              Serial.print("amplitude: ");
+              Serial.println(dpvAmplitude);
+              Serial.print("pulseWidth: ");
+              Serial.println(dpvPulseWidth);
+              Serial.print("pulsePeriod: ");
+              Serial.println(dpvPulsePeriod);
               break;
             case 's':
             case 'S':
-              selectSWV();
+              swvStartMV = vToMV(settings["startV"].as<float>());
+              verticesV = settings["verticesV"].as<JsonArray>();
+              swvVertices = 0;
+              for (JsonVariant v : verticesV) {
+                swvVerticesMVs[swvVertices++] = vToMV(v.as<float>());
+              }
+              swvEndMV = vToMV(settings["endV"].as<float>());
+              swvIncrE = vToMV(settings["incrE"].as<float>());
+              swvAmplitude = vToMV(settings["amplitude"].as<float>());
+              swvPulsePeriod = (1.0 / settings["frequency"].as<int>()) * 1000000;
+              loadSWV();
+
+              Serial.print("startMV: ");
+              Serial.println(swvStartMV);
+              Serial.print("verticesMV: ");
+              for (int i = 0; i < swvVertices - 1; i++) {
+                Serial.print(swvVerticesMVs[i]);
+                Serial.print(", ");
+              }
+              Serial.println(swvVerticesMVs[swvVertices-1]);
+              Serial.print("endMV: ");
+              Serial.println(swvEndMV);
+              Serial.print("incrE: ");
+              Serial.println(swvIncrE);
+              Serial.print("amplitude: ");
+              Serial.println(swvAmplitude);
+              Serial.print("pulsePeriod: ");
+              Serial.println(swvPulsePeriod);
               break;
-            case 'c':
-            case 'C':
-              callibrateADS();
+            default:
               break;
           }
         }
@@ -201,9 +303,14 @@ void loop() {
       }
       break;
     case ACTIVE:
-      unsigned long get_time = micros() - ini_time;
-      idx = get_time / sampleWidthUS;  // segments time into 10ms intervals
-      funcISR();
+      if (updateV_f == true) {
+        idx = (micros() - ini_time) / sampleWidthUS;  // segments time into 1ms intervals
+        if (prev_idx != idx) {
+          onUpdate();
+          prev_idx = idx;
+        }
+      }
+
       // IF setV_f is true, set voltage (channel A) so WE-RE=outputMV
       if (setV_f == true) {
         setVoltage_A((2000.0 - outputMV) / 1000.0 - AmpOffset);
@@ -212,8 +319,8 @@ void loop() {
 
       // IF sampleV_f is true, read from ADC and send on Serial.print()
       if (sampleV_f == true) {
-        int32_t results = (read_Value() >> 8) << 8;  // Clear last 8 bits b/c noisy
-        Serial.println(results);
+        int32_t results = (read_Value() >> 9) << 9;  // Clear last 9 bits b/c noisy
+        //Serial.println(results);
         sampleV_f = false;
       }
       if (end_f == true) {
@@ -226,7 +333,17 @@ void loop() {
         state = IDLE;
       }
       break;
+    default:
+      break;
   }
+}
+
+int vToMV(float voltage) {
+  return round(voltage * 1000);
+}
+
+unsigned long sToUS(float seconds) {
+  return round(seconds * 1000000);
 }
 
 void reset(float voltage) {
@@ -234,22 +351,15 @@ void reset(float voltage) {
   setV_f = false;
   sampleV_f = false;
   end_f = false;
+  prev_idx = 0;
+  idx = 0;
+  customReset();
+
   setVoltage_A((2000.0 - voltage) / 1000.0 - AmpOffset);
   ini_time = micros();
-
-  if (trueSwvStartMV < trueSwvVerticesMVs[0]) {
-    swvIsForward = true;
-  } else {
-    swvIsForward = false;
-  }
-  swvFinishedVertices = false;
-  swvBreakMV = trueSwvVerticesMVs[0];
-  swvNewStartMV = trueSwvStartMV;
-  swvCount = 0;
 }
 
-void selectDPV() {
-  // Update Variables
+void loadDPV() {
   dpvPulseStart = (dpvPulsePeriod - dpvPulseWidth) / sampleWidthUS;
   dpvPulseLength = dpvPulsePeriod / sampleWidthUS;
 
@@ -263,16 +373,21 @@ void selectDPV() {
   } else {
     dpvIsForward = true;
   }
+}
+
+void selectDPV() {
+  loadDPV();
 
   startMV = trueDpvStartMV;
   endMV = trueDpvEndMV;
   quietTime = dpvQuietTime;
   relaxTime = dpvRelaxTime;
-  funcISR = updateDPV;
+  onUpdate = updateDPV;
+  // DPV varaibles do not change so customReset is blank
+  customReset = [] {};
 }
 
-void selectSWV() {
-  // Update Variables
+void loadSWV() {
   swvPulseCenter = (swvPulsePeriod / 2) / sampleWidthUS;
   swvPulseLength = swvPulsePeriod / sampleWidthUS;
 
@@ -281,9 +396,22 @@ void selectSWV() {
     trueSwvVerticesMVs[i] = swvVerticesMVs[i] - swvAmplitude;
   }
   trueSwvEndMV = swvEndMV - swvAmplitude;
-
   trueSwvIncrE = swvIncrE < 0 ? -swvIncrE : swvIncrE;
+  resetSWV();
+}
 
+void selectSWV() {
+  loadSWV();
+
+  startMV = trueSwvStartMV;
+  endMV = trueSwvEndMV;
+  quietTime = swvQuietTime;
+  relaxTime = swvRelaxTime;
+  onUpdate = updateSWV;
+  customReset = resetSWV;
+}
+
+void resetSWV() {
   if (trueSwvStartMV < trueSwvVerticesMVs[0]) {
     swvIsForward = true;
   } else {
@@ -292,12 +420,7 @@ void selectSWV() {
   swvFinishedVertices = false;
   swvBreakMV = trueSwvVerticesMVs[0];
   swvNewStartMV = trueSwvStartMV;
-
-  startMV = trueSwvStartMV;
-  endMV = trueSwvEndMV;
-  quietTime = swvQuietTime;
-  relaxTime = swvRelaxTime;
-  funcISR = updateSWV;
+  swvCount = 0;
 }
 
 /**
@@ -373,13 +496,13 @@ void updateSWV() {
 // ISR
 
 void timer_init() {
-  // TIMER 1 for interrupt frequency 3000.1875117194822 Hz:
+  // TIMER 1 for interrupt frequency 32 kHz:
   cli();       // stop interrupts
   TCCR1A = 0;  // set entire TCCR1A register to 0
   TCCR1B = 0;  // same for TCCR1B
   TCNT1 = 0;   // initialize counter value to 0
-  // set compare match register for 3000.1875117194822 Hz ments
-  OCR1A = 5332;  // = 16000000 / (1 * 3000.1875117194822) - 1 (must be <65536)
+  // set compare match register for 32 kHz ments
+  OCR1A = 499;  // = 16000000 / (1 * 32000) - 1 (must be <65536)
   // turn on CTC mode
   TCCR1B |= (1 << WGM12);
   // Set CS12, CS11 and CS10 bits for 1 prescaler
@@ -389,12 +512,12 @@ void timer_init() {
   sei();  // allow interrupts
 }
 
-ISR(TIMER1_COMPA_vect) {  // interrupt service routine
-  // Sample Every 3rd Call (1000.0625039065 Hz)
+ISR(TIMER1_COMPA_vect) {  // interrupt service routine at 32 kHz
+  updateV_f = true;
   if (k == 0) {
     sampleV_f = true;
   }
-  k = (k + 1) % 3;
+  k = (k + 1) % 8;
 }
 
 // DAC
@@ -402,7 +525,7 @@ ISR(TIMER1_COMPA_vect) {  // interrupt service routine
 void setVoltage_A(float voltage) {
   uint16_t data = Voltage_Convert(voltage);
   DAC_WR(WR_LOAD_A, data);
-  //sendDACCSV(voltage);
+  sendDACCSV(voltage);
 }
 
 void setVoltage_B(float voltage) {
@@ -439,7 +562,8 @@ void initADS() {
   adc_WR8(0x00, 0x32);  // Enable Buffer
   adc_WR8(0x02, 0x03);  // PGA=8
   //adc_WR8(0x02, 0x04);  // PGA=16
-  adc_WR8(0x03, 0xC0);  // DRATE=3,750SPS
+  adc_WR8(0x03, 0xF0);  // DRATE=3,750SPS
+  //adc_WR8(0x03, 0x0);  // DRATE=3,750SPS
   delay(100);           // settling time: 3750SPS needs 0.44ms
 
   callibrateADS();
