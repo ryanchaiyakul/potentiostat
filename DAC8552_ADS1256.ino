@@ -53,8 +53,8 @@
 // DPV Settings
 
 // All in mV
-int dpvStartMV = -100;  // 100mv
-int dpvEndMV = -450;    // 600mv
+int dpvStartMV = -100;
+int dpvEndMV = -450;
 int dpvIncrE = 5;       // Sign calculated later
 int dpvAmplitude = 50;
 
@@ -79,9 +79,9 @@ bool dpvIsForward;
 // SWV Settings
 
 // All in mV
-int swvStartMV = 1000;  // 100mv
-int swvVerticesMVs[4] = { 0 };
-int swvEndMV = 1000;  // 600mv
+int swvStartMV = 1000;
+int swvVerticesMVs[4] = { 0 }; // up to 4 vertices
+int swvEndMV = 1000;
 int swvIncrE = 2;
 int swvAmplitude = 25;
 
@@ -100,7 +100,7 @@ int trueSwvStartMV;
 int trueSwvEndMV;
 int trueSwvIncrE;
 
-int8_t swvIsForward;
+bool swvIsForward;
 bool swvFinishedVertices;
 int swvCount;
 int swvBreakMV;
@@ -149,7 +149,6 @@ JsonArray verticesV;
 
 void setup() {
   Serial.begin(BAUD_RATE);
-  Serial.setTimeout(200);
 
   // pin setup
   pinMode(SCLK, OUTPUT);  // CLK
@@ -309,24 +308,17 @@ void loop() {
       }
       // IF sampleV_f is true, read from ADC and send on Serial.print()
       if (sampleV_f == true) {
-        int32_t results = (read_Value() >> 8) << 8;  // Clear last 9 bits b/c noisy
-        Serial.println(results);
-        sampleV_f = false;
-        /**
         adcSendCMD(READ);
         read_f = true;
         sampleV_f = false;
-        */
       }
 
-      /**
       // Read from ADS if ready
       if (read_f && !digitalRead(RDY)) {
         int32_t results = (read_Value() >> 8) << 8;  // Clear last 9 bits b/c noisy
         Serial.println(results);
         read_f = false;
       }
-      */
 
       // Experiments ends naturally or send anything to escape
       if (end_f == true || Serial.available()) {
@@ -667,8 +659,8 @@ void adc_WR8(byte addr, uint8_t data) {
 // Must send READ cmd earlier and wait for DRDY
 int32_t read_Value() {
   int32_t adc_val;
-  adcSendCMD(READ);
-  waitforDRDY();  // Wait until DRDY is LOW
+  //adcSendCMD(READ);
+  //waitforDRDY();  // Wait until DRDY is LOW
   SPI.beginTransaction(SPISettings(ADC_SPEED, MSBFIRST, SPI_MODE1));
   digitalWrite(CS_adc, LOW);  //Pull SS Low to Enable Communications with ADS1247
   SPI.transfer(0x01);         // Issue read data command RDATA
