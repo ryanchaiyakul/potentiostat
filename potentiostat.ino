@@ -346,7 +346,7 @@ unsigned long sToUS(float seconds) {
 }
 
 // reset flags and set channel A to resting voltage
-void reset(float voltage) {
+void reset(int voltage) {
   //Serial.println("~");  // Start/End of experiment
   // Reset flags
   state = QUIET;

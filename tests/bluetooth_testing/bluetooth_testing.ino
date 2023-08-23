@@ -33,9 +33,8 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   if (Serial.available()) {
-    uint16_t len = Serial.readBytes(raw, 126) - 1;
-    raw[len] = '\0';
-    sendBT(CMD_DATA_REQ, raw, len);
+    raw[Serial.readBytes(raw, 126) - 1] = '\0';
+    sendMessage(raw);
   }
 
   if (mySerial.available()) {
@@ -45,19 +44,17 @@ void loop() {
       case 0:
         Serial.println(output);
         break;
-        case 1:
-          Serial.println("Unknown start byte");
-        case 2:
-          Serial.println("Corrupted message");
-          Serial.println(output);
-          break;
-        case 3:
-          Serial.println("Unknown command");
-        default:
+      case 1:
+        Serial.println("Unknown start byte");
+      case 2:
+        Serial.println("Corrupted message");
+        Serial.println(output);
+        break;
+      case 3:
+        Serial.println("Unknown command");
+      default:
         break;
     }
-   
-    
   }
 
   /**
@@ -69,6 +66,13 @@ void loop() {
   */
 }
 
+/**
+ Return codes:
+ 0: validated message recieved (and updates output)
+ 1: unknown start byte
+ 2: cs failed
+ 3: unknown message
+ */
 uint8_t recieveBT(char* data, uint16_t len) {
   if (data[0] != 0x02) {
     return 1;
@@ -80,7 +84,9 @@ uint8_t recieveBT(char* data, uint16_t len) {
   for (uint16_t i = 2; i < len - 1; i++) {
     cs ^= data[i];
   }
-  
+  if (cs != data[len - 1]) {
+    return 2;
+  }
 
   switch (cmd) {
     case CMD_DATA_IND:
@@ -90,9 +96,6 @@ uint8_t recieveBT(char* data, uint16_t len) {
         output[i] = data[i + 11];
       }
       output[len + 4] = '\0';
-      if (cs != data[len - 1]) {
-        return 2;
-      }
       return 0;
       break;
     default:
@@ -100,11 +103,26 @@ uint8_t recieveBT(char* data, uint16_t len) {
   }
 }
 
+/**
+ Hard coded send ABCD
+*/
 void sendABCD() {
   byte data[] = { 0x02, 0x04, 0x04, 0x00, 0x41, 0x42, 0x43, 0x44, 0x06 };
   mySerial.write(data, 9);
 }
 
+/**
+Send a c-string over BT
+*/
+void sendMessage(char* data) {
+  int i = 0;
+  while (data[i]) { i++ };
+  sendBT(CMD_DATA_REQ, data, i);
+}
+
+/**
+Send command to bluetooth
+*/
 void sendBT(byte cmd, char* data, uint16_t len) {
   mySerial.write(0x02);  // from datasheet
   mySerial.write(cmd);
