@@ -24,8 +24,6 @@ unsigned long total_time;
 uint32_t sample_counter = 150000;
 
 uint8_t outputBuffer[3];
-
-bool volatile dataReady = false;
 int count = 0;
 
 void setup() {
@@ -43,7 +41,7 @@ void setup() {
   pinMode(RDY, INPUT);
   pinMode(DOUT, INPUT);  // MISO
 
-  attachInterrupt(digitalPinToInterrupt(RDY), RDY_ISR, FALLING);
+  //attachInterrupt(digitalPinToInterrupt(RDY), RDY_ISR, FALLING);
 
   initADS();
   printCallibration();
@@ -51,6 +49,11 @@ void setup() {
 }
 
 void loop() {
+  uint32_t i = 0;
+  while (i < count) {
+    read_single();
+    i++;
+  }
   read_multi(sample_counter);
   total_time = micros() - ini_time;
   Serial.print("Total Duration (us): ");
@@ -113,20 +116,15 @@ void printCallibration() {
    Blocks until DRDY falls
 */
 void waitforDRDY() {
-  dataReady = false;
-  while (!dataReady) {
+  while(digitalRead(RDY)) {
     continue;
   }
-}
-
-void RDY_ISR () {
-  dataReady = true;
 }
 
 void read_multi(uint32_t count) {
   SPI.beginTransaction(SPISettings(ADC_SPEED, MSBFIRST, SPI_MODE1));
   digitalWrite(CS_adc, LOW);  //Pull SS Low to Enable Communications with ADS1247
-  while (dataReady == false) {} //Wait until DRDY does low, then issue the command
+  waitforDRDY(); //Wait until DRDY does low, then issue the command
   SPI.transfer(RDATAC);
   delayMicroseconds(7); //Wait t6 time (~6.51 us) REF: P34, FIG:30.
 

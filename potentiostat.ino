@@ -2,7 +2,7 @@
 #include <ArduinoJson.h>
 
 // SPI Speeds
-#define ADC_SPEED 1000000
+#define ADC_SPEED 2000000
 #define DAC_SPEED 16000000
 
 // Baud Rate
@@ -17,7 +17,9 @@
 // ADC Commands
 #define RESET 0xFE
 #define CALLIBRATE 0xF0
-#define READ 0x10
+#define RDATA 0x01
+#define RDATAC 0x03
+#define SDATAC 0x0F
 
 // Pinout
 #define RDY 3
@@ -28,7 +30,7 @@
 #define SCLK 13  // SCLK
 
 // DAC Constants
-#define RefDACMV 3301        // 5v
+#define RefDACMV 3314        // 5v
 #define AmpOffset 0          // 0.103v
 #define sampleWidthUS 1000   // 1ms granularity
 
@@ -110,6 +112,7 @@ int trueSwvVerticesMVs[4];
 // ADC Callibration
 int32_t ofc;
 uint32_t fsc;
+uint8_t outputBuffer[3];
 
 // ISR Variables
 uint8_t k = 0;                    // counter to sample at 4000 Hz (30,000 SPS)
@@ -122,7 +125,6 @@ unsigned long ini_time;  // start of experiment
 unsigned long prev_idx;            // Compared with idx to call onUpdate
 int8_t state = IDLE;
 char serialValue[126];
-bool read_f = false;  // waiting for an ADS value
 
 unsigned long quietTime;    // set to quietTime for respective mode
 unsigned long relaxTime;    // set to relaxTime for respective mode
@@ -308,16 +310,9 @@ void loop() {
       }
       // IF sampleV_f is true, read from ADC and send on Serial.print()
       if (sampleV_f == true) {
-        adcSendCMD(READ);
-        read_f = true;
-        sampleV_f = false;
-      }
-
-      // Read from ADS if ready
-      if (read_f && !digitalRead(RDY)) {
-        int32_t results = (read_Value() >> 8) << 8;  // Clear last 9 bits b/c noisy
+        int32_t results = (read_single() >> 8) << 8;  // Clear last 9 bits b/c noisy
         Serial.println(results);
-        read_f = false;
+        sampleV_f = false;
       }
 
       // Experiments ends naturally or send anything to escape
@@ -353,7 +348,6 @@ void reset(int voltage) {
   setV_f = false;
   sampleV_f = false;
   end_f = false;
-  read_f = false;
   prev_idx = 0;
   idx = 0;
   customReset();
@@ -600,24 +594,21 @@ uint16_t Voltage_Convert(float voltage) {
 // ADC
 
 void initADS() {
-  delayMicroseconds(10);
   adcSendCMD(RESET);  //RESET Command
   delay(100);         //let the system power up and stabilize (datasheet pg 24)
 
   // ADS Settings
   adc_WR8(0x01, 0x01);  // AIN0-AIN1
   adc_WR8(0x00, 0x32);  // Enable Buffer
-  adc_WR8(0x02, 0x03);  // PGA=8
-  //adc_WR8(0x02, 0x04);  // PGA=16
-  adc_WR8(0x03, 0xC0);  // DRATE=3,750SPS
-  delay(100);  // settling time: 3750SPS needs 0.44ms
-
+  adc_WR8(0x02, 0x02);  // PGA=4
+  adc_WR8(0x03, 0xF0);  // DRATE=30,000SPS
+  delayMicroseconds(250);  // settling time: 30,000SPS needs 0.21ms
   callibrateADS();
 }
 
 void callibrateADS() {
   adcSendCMD(CALLIBRATE);  //send the calibration command
-  delay(10);
+  delayMicroseconds(800);  // roughly 692 us for 30,000SPS PGA=4
 
   waitforDRDY();  // Wait until DRDY is LOW => calibration complete
   uint8_t off0 = adc_RD8(0x05);
@@ -639,31 +630,43 @@ void printCallibration() {
   Serial.println(fsc);
 }
 
-// BLOCKING, ONLY USE FOR CALLIBRATION
+/**
+   Blocks until DRDY falls
+*/
 void waitforDRDY() {
-  while (digitalRead(RDY)) {
+  while(digitalRead(RDY)) {
     continue;
   }
 }
 
-void adc_WR8(byte addr, uint8_t data) {
+void read_multi(uint32_t count) {
   SPI.beginTransaction(SPISettings(ADC_SPEED, MSBFIRST, SPI_MODE1));
-  digitalWrite(CS_adc, LOW);
-  SPI.transfer(addr + 0x50);
-  SPI.transfer(0x00);
-  SPI.transfer(data);
+  digitalWrite(CS_adc, LOW);  //Pull SS Low to Enable Communications with ADS1247
+  waitforDRDY(); //Wait until DRDY does low, then issue the command
+  SPI.transfer(RDATAC);
+  delayMicroseconds(7); //Wait t6 time (~6.51 us) REF: P34, FIG:30.
+
+  uint32_t i = 0;
+  while (i < count) {
+    waitforDRDY();
+    outputBuffer[0] = SPI.transfer(0);
+    outputBuffer[1] = SPI.transfer(0);
+    outputBuffer[2] = SPI.transfer(0);
+    //Serial.write(outputBuffer, 3);
+    //Serial.write('\n');
+    i++;
+  }
+  SPI.transfer(SDATAC);
   digitalWrite(CS_adc, HIGH);
   SPI.endTransaction();
 }
 
-// Must send READ cmd earlier and wait for DRDY
-int32_t read_Value() {
+int32_t read_single() {
   int32_t adc_val;
-  //adcSendCMD(READ);
-  //waitforDRDY();  // Wait until DRDY is LOW
   SPI.beginTransaction(SPISettings(ADC_SPEED, MSBFIRST, SPI_MODE1));
   digitalWrite(CS_adc, LOW);  //Pull SS Low to Enable Communications with ADS1247
-  SPI.transfer(0x01);         // Issue read data command RDATA
+  waitforDRDY();  // Wait until DRDY is LOW
+  SPI.transfer(RDATA);         // Issue read data command RDATA
   delayMicroseconds(7);
 
   // assemble 3 bytes into one 32 bit word
@@ -681,15 +684,25 @@ int32_t read_Value() {
   return adc_val;
 }
 
+void adc_WR8(byte addr, uint8_t data) {
+  SPI.beginTransaction(SPISettings(ADC_SPEED, MSBFIRST, SPI_MODE1));
+  digitalWrite(CS_adc, LOW);
+  delayMicroseconds(5);
+  SPI.transfer(0x50 | addr);
+  SPI.transfer(0x00);
+  SPI.transfer(data);
+  digitalWrite(CS_adc, HIGH);
+  SPI.endTransaction();
+}
+
 uint8_t adc_RD8(byte addr) {
   uint8_t bufr;
   SPI.beginTransaction(SPISettings(ADC_SPEED, MSBFIRST, SPI_MODE1));
   digitalWrite(CS_adc, LOW);
-  SPI.transfer(0x10 + addr);  // send 1st command byte, address of the register
+  SPI.transfer(0x10 | addr);  // send 1st command byte, address of the register
   SPI.transfer(0x00);         // send 2nd command byte, read only one register
-  delayMicroseconds(10);
+  delayMicroseconds(5);
   bufr = SPI.transfer(0);  // read data of the register
-  delayMicroseconds(2);
   digitalWrite(CS_adc, HIGH);
   SPI.endTransaction();
   return bufr;
@@ -702,6 +715,7 @@ void adcSendCMD(uint8_t cmd) {
   digitalWrite(CS_adc, HIGH);
   SPI.endTransaction();
 }
+
 
 // DEBUGGING
 

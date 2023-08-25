@@ -11,7 +11,7 @@ const int CS_dac = 10;
 const int SCLK = 13;
 const int DOUT = 12;
 
-float RefDACMV = 3301;    // 5v
+float RefDACMV = 3314;    // 5v
 
 bool toggle = false;
 unsigned long ini_time;
