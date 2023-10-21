@@ -19,6 +19,7 @@ jobs:
           python-version: '3.9'
       - name: Install PlatformIO Core
         run: pip install --upgrade platformio
-
+      - name: Update Git Submodules
+        run: git submodule update --recursive 
       - name: Build PlatformIO Project
         run: pio run
