@@ -114,6 +114,7 @@ Action SWV::calculateAction()
             return Action();
         }
         baseMV += isForward ? incrE : -incrE;
+        // TODO: Think of a faster method of switching directions
         // Determine when to change directions
         if (!finishedVertices)
         {
