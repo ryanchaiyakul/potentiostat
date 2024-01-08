@@ -1,5 +1,7 @@
 # Potentiostat
 
+[![PlatformIO CI](https://github.com/ryanchaiyakul/potentiostat/actions/workflows/platformio.yml/badge.svg)](https://github.com/ryanchaiyakul/potentiostat/actions/workflows/platformio.yml)
+
 I2BL potentiostat library and project.
 
 # Goals
