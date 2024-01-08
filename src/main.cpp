@@ -17,13 +17,13 @@
 #define DOUT 12 // MOSI
 #define SCLK 13 // SCLK
 
-#define REFDACMV 3310
+#define REFDACMV 3300
 #define AMPOFFSET 0
 
 #define MINMV 2000 - REFDACMV // WE-RE lowest voltage
 #define MAXMV 2000            // WE-RE highest voltage
 
-#define SAMPLECOUNT 2 // Samples during sample period
+#define SAMPLECOUNT 4 // Samples during sample period
 
 // Modes
 #define SERIAL_MODE 0
@@ -36,8 +36,8 @@
 // DPV Settings
 
 // All in mV
-int dpvStartMV = 0;
-int dpvEndMV = -350;
+int dpvStartMV = 100;
+int dpvEndMV = -250;
 int dpvIncrE = 5; // Sign calculated later
 int dpvAmplitude = 25;
 
@@ -57,14 +57,14 @@ unsigned long dpvSamplingOffsetUS = 1670;
 // All in mV
 int swvStartMV = 0;
 int swvVerticesMVs[4] = {0}; // up to 4 vertices
-int swvEndMV = -350;
+int swvEndMV = -400;
 int swvIncrE = 1;
 int swvAmplitude = 25;
 
 int swvVertices = 0;
 
 // 10ms granularity (us)
-unsigned long swvFrequency = 200;     // Hz <= 200 Hz
+unsigned long swvFrequency = 60;     // Hz <= 200 Hz
 unsigned long swvQuietTime = 2000000; // Hold reference at swvTrueStartMV for x us
 unsigned long swvRelaxTime = 2000000; // Hold reference at swvTrueEndMV for x us
 unsigned long swvSamplingOffsetUS = 1000;
@@ -78,8 +78,7 @@ int i; // tracks which sample has been sent
 // Debug
 bool debug_f = false;
 unsigned long start_time;
-int count, missed_samples;
-bool sent;
+unsigned count;
 
 ADS1256 adc(CS_adc, RDY);
 DAC8552 dac(CS_dac, REFDACMV);
@@ -131,33 +130,24 @@ void serialCMD(byte cmd)
     {
       state = DEB_MODE;
       start_time = micros();
-      count = missed_samples = 0;
     }
     else
     {
       state = EXP_MODE;
+      adc.printCallibration();
     }
-    i = SAMPLECOUNT; // Prevents sending a blank sample
-    adc.printCallibration();
+    i = 0;
     method->reset();
     break;
   // DPV mode
   case 'd':
   case 'D':
     selectDPV();
-    if (debug_f)
-    {
-      method->printSettings();
-    }
     break;
   // SWV mode
   case 's':
   case 'S':
     selectSWV();
-    if (debug_f)
-    {
-      method->printSettings();
-    }
     break;
   // CallibrateADS
   case 'c':
@@ -185,13 +175,7 @@ void setup()
   selectDPV();
 }
 
-/**
-   DO NOT MODIFY
-
-   Change DPV/SWV Settings above (or in Serial)
-*/
-void loop()
-{
+void potentiostatMain() {
   switch (state)
   {
   case SERIAL_MODE:
@@ -205,37 +189,19 @@ void loop()
     switch (status)
     {
     case NONE:
-      if (i < SAMPLECOUNT)
-      {
-        // TODO: Correctly output voltage
-        // assemble 3 bytes into one 32 bit word
-        int32_t adc_val = ((uint32_t)adc.outputBuffer[i][0] << 16) & 0x00FF0000;
-        adc_val |= ((uint32_t)adc.outputBuffer[i][1] << 8);
-        adc_val |= adc.outputBuffer[i][2];
-        if (adc_val & 0x800000)
-        {
-          adc_val |= 0xFF000000;
-        }
-        Serial.println((adc_val >> 8) << 8);
-        // Serial.write(adc.outputBuffer[i][0]);
-        // Serial.write(adc.outputBuffer[i][1]);
-        i++;
-      }
+      // TODO: Implement working burst mode
       break;
     case SHIFTV:
       dac.setA((2000.0 - method->getVoltage()) / 1000.0 - AMPOFFSET);
       break;
     case SAMPLE:
-      adc.readMulti(SAMPLECOUNT);
+      while (i++ < SAMPLECOUNT) {
+        Serial.println(adc.readSingle() & ((int32_t) 0xFFFFFF00));
+      }
       i = 0;
       break;
     case DONE:
       // Send last sample if there was not time to send it
-      if (i < SAMPLECOUNT)
-      {
-        Serial.println((((int16_t)adc.outputBuffer[i][0]) << 8) + adc.outputBuffer[i][1]);
-        i++;
-      }
       state = SERIAL_MODE;
       break;
     }
@@ -247,16 +213,6 @@ void loop()
     switch (status)
     {
     case NONE:
-      if (i < SAMPLECOUNT)
-      {
-        // TODO: satisfactory delay to printing without actually cluttering debug
-        i++;
-      }
-      if (i == SAMPLECOUNT)
-      {
-        sent = true;
-      }
-      break;
       break;
     case SHIFTV:
       Serial.print(micros() - start_time);
@@ -264,31 +220,36 @@ void loop()
       Serial.println(method->getVoltage());
       break;
     case SAMPLE:
-      i = 0;
       // Count # of sent samples and timing
       Serial.print(micros() - start_time);
       Serial.print(',');
       Serial.println("Sample");
       count++;
-
-      // Count # of missed samples because output buffer overridden
-      if (!sent)
-      {
-        missed_samples++;
-      }
-      sent = false;
       break;
     case DONE:
       state = SERIAL_MODE;
-      // Debug outputs
-      Serial.println();
-      Serial.print("# of samples: ");
-      Serial.println(count);
-      Serial.print("# of missed samples: ");
-      Serial.println(missed_samples);
       break;
     }
   }
   break;
   }
+}
+
+/**
+   DO NOT MODIFY
+
+   Change DPV/SWV Settings above (or in Serial)
+*/
+void loop()
+{
+  potentiostatMain();
+}
+
+void test() {
+  Serial.println("2.0");
+  dac.setA(2.0);
+  delay(1000);
+  Serial.println("2.4");
+  dac.setA(2.4);
+  delay(1000);
 }

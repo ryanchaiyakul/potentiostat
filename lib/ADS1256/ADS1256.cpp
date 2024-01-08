@@ -88,15 +88,14 @@ void ADS1256::readMulti(uint8_t count)
   SPI.transfer(RDATAC);
   delayMicroseconds(7); // Wait t6 time (~6.51 us) REF: P34, FIG:30.
 
-  uint8_t i = 0;
-  while (i < count)
+  for (int i = 0; i < count; i++)
   {
     waitforDRDY();
-    outputBuffer[i][0] = SPI.transfer(0);
+    outputBuffer[i][0] = SPI.transfer(0); // MSB
     outputBuffer[i][1] = SPI.transfer(0);
-    outputBuffer[i][2] = SPI.transfer(0); // Last byte is noisey
-    i++;
+    outputBuffer[i][2] = SPI.transfer(0); // Noisy at 30k SPS and PGA=4 but for completeness
   }
+  waitforDRDY();
   SPI.transfer(SDATAC);
   digitalWrite(cs, HIGH);
   SPI.endTransaction();
@@ -125,6 +124,124 @@ int32_t ADS1256::readSingle()
     adc_val |= 0xFF000000;
   }
   return adc_val;
+}
+
+void ADS1256::readDifferentialSingle() //"High-speed" version of the cycleDifferential() function
+{
+  // Relevant viodeo: https://youtu.be/GBWJdyjRIdM
+
+  int cycle = 1;
+  int32_t registerData = 0;
+  String ConversionResults;
+
+  SPI.beginTransaction(SPISettings(1920000, MSBFIRST, SPI_MODE1)); // We start this SPI.beginTransaction once.
+
+  // Setting up the input channel
+  digitalWrite(cs, LOW);  // CS must stay LOW during the entire sequence [Ref: P34, T24]
+  SPI.transfer(0x50 | 1); // 0x50 = WREG //1 = MUX
+  SPI.transfer(0x00);
+  SPI.transfer(B00000001); // AIN0+AIN1
+  digitalWrite(cs, HIGH);
+
+  SPI.endTransaction();
+
+  for (int package = 0; package < 10; package++) // We will collect 10 "packages"
+  {
+    for (cycle = 1; cycle < 5; cycle++)
+    {
+      // we cycle through all the 4 differential channels with the RDATA
+
+      // RDATA = B00000001
+      // SYNC = B11111100
+      // WAKEUP = B11111111
+
+      // Steps are on Page21
+      // Step 1. - Updating MUX
+
+      waitforDRDY();
+
+      switch (cycle)
+      {
+      case 1:                   // Channel 2
+        digitalWrite(cs, LOW);  // CS must stay LOW during the entire sequence [Ref: P34, T24]
+        SPI.transfer(0x50 | 1); // 0x50 = WREG //1 = MUX
+        SPI.transfer(0x00);
+        SPI.transfer(B00100011); // AIN2+AIN3
+        break;
+
+      case 2:                   // Channel 3
+        digitalWrite(cs, LOW);  // CS must stay LOW during the entire sequence [Ref: P34, T24]
+        SPI.transfer(0x50 | 1); // 0x50 = WREG //1 = MUX
+        SPI.transfer(0x00);
+        SPI.transfer(B01000101); // AIN4+AIN5
+        break;
+
+      case 3:                   // Channel 4
+        digitalWrite(cs, LOW);  // CS must stay LOW during the entire sequence [Ref: P34, T24]
+        SPI.transfer(0x50 | 1); // 0x50 = WREG //1 = MUX
+        SPI.transfer(0x00);
+        SPI.transfer(B01100111); // AIN6+AIN7
+        break;
+
+      case 4:                   // Channel 1
+        digitalWrite(cs, LOW);  // CS must stay LOW during the entire sequence [Ref: P34, T24]
+        SPI.transfer(0x50 | 1); // 0x50 = WREG //1 = MUX
+        SPI.transfer(0x00);
+        SPI.transfer(B00000001); // AIN0+AIN1
+        break;
+      }
+
+      /**
+       SPI.transfer(B11111100); // SYNC
+
+      delayMicroseconds(4); // t11 delay 24*tau = 3.125 us //delay should be larger, so we delay by 4 us
+
+      SPI.transfer(B11111111); // WAKEUP
+      */
+      
+      // Step 3.
+      // Issue RDATA (0000 0001) command
+      SPI.transfer(B00000001);
+
+      // Wait t6 time (~6.51 us) REF: P34, FIG:30.
+      delayMicroseconds(5);
+
+      // step out the data: MSB | mid-byte | LSB,
+
+      // registerData is ZERO
+      registerData |= SPI.transfer(0x0F); // MSB comes in, first 8 bit is updated // '|=' compound bitwise OR operator
+      registerData <<= 8;                 // MSB gets shifted LEFT by 8 bits
+      registerData |= SPI.transfer(0x0F); // MSB | Mid-byte
+      registerData <<= 8;                 // MSB | Mid-byte gets shifted LEFT by 8 bits
+      registerData |= SPI.transfer(0x0F); //(MSB | Mid-byte) | LSB - final result
+      // After this, DRDY should go HIGH automatically
+
+      // Constructing an output
+      ConversionResults = ConversionResults + registerData;
+      if (cycle < 4)
+      {
+        ConversionResults = ConversionResults + "\t";
+      }
+      else
+      {
+        ConversionResults = ConversionResults;
+      }
+      //---------------------
+      registerData = 0;
+      digitalWrite(cs, HIGH); // We finished the command sequence, so we switch it back to HIGH
+
+      // Expected output when using a resistor ladder of 1k resistors and the ~+5V output of the Arduino:
+      // Formatting  Channel 1 Channel 2 Channel 3 Channel 4
+      /*
+      16:14:23.066 -> 4.79074764  4.16625738  3.55839943  2.96235866
+      16:14:23.136 -> 4.79277801  4.16681241  3.55990862  2.96264190
+      16:14:23.238 -> 4.79327344  4.16698741  3.55968427  2.96277694        */
+    }
+    ConversionResults = ConversionResults + '\n'; // Add a linebreak after a line of data (4 columns)
+  }
+  Serial.print(ConversionResults); // print everything after 10 packages
+  ConversionResults = "";
+  SPI.endTransaction();
 }
 
 /**

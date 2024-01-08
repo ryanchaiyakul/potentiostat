@@ -22,6 +22,7 @@ public:
   void printCallibration();
   int32_t readSingle();
   void readMulti(uint8_t);
+  void readDifferentialSingle();
   uint8_t outputBuffer[BUFFER_CAPACITY][3];
 
 private:
