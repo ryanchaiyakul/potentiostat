@@ -41,6 +41,8 @@ struct Action
  * Usage:
  *
  * Call update() as frequently as possible and execute on its return status
+ * 
+ * TODO: Add cached mode (Precaculate values and store in look up table)
  */
 class Voltammetry
 {

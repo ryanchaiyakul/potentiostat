@@ -1,0 +1,170 @@
+Circuit: * C:\Users\12345\Documents\Dev\potentiostat\CAD\LTSpice\Control Amp\ADA4622\Control Amp ADA4625.asc
+
+.step rewe=5000 cere=1
+Direct Newton iteration failed to find .op point.  (Use ".option noopiter" to skip.)
+Starting Gmin stepping
+Increasing initial diagonal Gmin to 100
+Increasing initial diagonal Gmin to 1000
+Gmin = 1000
+Gmin = 107.374
+Gmin = 11.5292
+Gmin = 1.23794
+Gmin = 0.132923
+Gmin = 0.0142725
+Gmin = 0.0015325
+Gmin = 0.00016455
+Gmin = 1.76685e-05
+Gmin = 1.89714e-06
+Gmin = 2.03704e-07
+Gmin = 2.18725e-08
+Gmin = 2.34854e-09
+Gmin = 2.52173e-10
+Gmin = 2.70769e-11
+Gmin = 2.90735e-12
+Gmin = 3.12175e-13
+Gmin = 0
+Gmin stepping succeeded in finding the operating point.
+
+Direct Newton iteration failed to find .op point.  (Use ".option noopiter" to skip.)
+Starting Gmin stepping
+Increasing initial diagonal Gmin to 100
+Increasing initial diagonal Gmin to 1000
+Gmin = 1000
+Gmin = 107.374
+Gmin = 11.5292
+Gmin = 1.23794
+Gmin = 0.132923
+Gmin = 0.0142725
+Gmin = 0.0015325
+Gmin = 0.00016455
+Gmin = 1.76685e-05
+Gmin = 1.89714e-06
+Gmin = 2.03704e-07
+Gmin = 2.18725e-08
+Gmin = 2.34854e-09
+vernier = 0.5
+vernier = 0.25
+vernier = 0.125
+vernier = 0.0625
+vernier = 0.03125
+vernier = 0.015625
+vernier = 0.0078125
+vernier = 0.00390625
+Gmin = 1.87883e-09
+vernier = 0.00195312
+vernier = 0.000976562
+vernier = 0.000488281
+Gmin = 0
+Gmin stepping failed
+
+Starting source stepping with srcstepmethod=0
+Could not converge to DC with sources off!
+Starting source stepping with srcstepmethod=1
+Source Step = 3.0303%
+Source Step = 15.1545%
+Source stepping failed
+
+Pseudo Transient succeeded in finding the operating point at 327.772 ms.
+Direct Newton iteration failed to find .op point.  (Use ".option noopiter" to skip.)
+Starting Gmin stepping
+Increasing initial diagonal Gmin to 100
+Increasing initial diagonal Gmin to 1000
+Gmin = 1000
+Gmin = 107.374
+Gmin = 11.5292
+Gmin = 1.23794
+Gmin = 0.132923
+Gmin = 0.0142725
+Gmin = 0.0015325
+Gmin = 0.00016455
+Gmin = 1.76685e-05
+Gmin = 1.89714e-06
+Gmin = 2.03704e-07
+Gmin = 2.18725e-08
+vernier = 0.5
+vernier = 0.25
+vernier = 0.125
+vernier = 0.0625
+vernier = 0.03125
+vernier = 0.015625
+vernier = 0.0078125
+Gmin = 1.39984e-08
+vernier = 0.00390625
+vernier = 0.00195312
+vernier = 0.000976562
+vernier = 0.000488281
+Gmin = 0
+Gmin stepping failed
+
+Starting source stepping with srcstepmethod=0
+Could not converge to DC with sources off!
+Starting source stepping with srcstepmethod=1
+Source Step = 3.0303%
+Source Step = 15.1545%
+Source stepping failed
+
+Pseudo Transient succeeded in finding the operating point at 327.692 ms.
+Direct Newton iteration failed to find .op point.  (Use ".option noopiter" to skip.)
+Starting Gmin stepping
+Increasing initial diagonal Gmin to 100
+Increasing initial diagonal Gmin to 1000
+Gmin = 1000
+Gmin = 107.374
+Gmin = 11.5292
+Gmin = 1.23794
+Gmin = 0.132923
+Gmin = 0.0142725
+Gmin = 0.0015325
+Gmin = 0.00016455
+Gmin = 1.76685e-05
+Gmin = 1.89714e-06
+vernier = 0.5
+vernier = 0.25
+vernier = 0.125
+vernier = 0.0625
+vernier = 0.03125
+vernier = 0.015625
+Gmin = 9.71334e-07
+vernier = 0.0078125
+vernier = 0.00390625
+vernier = 0.00195312
+vernier = 0.000976562
+vernier = 0.000488281
+Gmin = 0
+Gmin stepping failed
+
+Starting source stepping with srcstepmethod=0
+Could not converge to DC with sources off!
+Starting source stepping with srcstepmethod=1
+Source Step = 3.0303%
+Source Step = 15.1545%
+Source stepping failed
+
+Pseudo Transient succeeded in finding the operating point at 351.932 ms.
+.step rewe=10000 cere=1
+.step rewe=100000 cere=1
+.step rewe=5000 cere=1000
+.step rewe=10000 cere=1000
+.step rewe=100000 cere=1000
+.step rewe=5000 cere=5000
+.step rewe=10000 cere=5000
+.step rewe=100000 cere=5000
+
+Date: Wed Jan 17 12:54:35 2024
+Total elapsed time: 15.972 seconds.
+
+tnom = 27
+temp = 27
+method = trap
+totiter = 66714
+traniter = 0
+tranpoints = 0
+accept = 0
+rejected = 1312
+matrix size = 87
+fillins = 123
+solver = Normal
+Avg thread counts: 1.1/8.9/2.1/1.1
+Matrix Compiler1: 10.63 KB object code size  3.3/2.5/[1.5]
+Matrix Compiler2: 9.63 KB object code size  1.9/2.1/[1.3]
+

@@ -1,0 +1,7 @@
+Removed Pin From Net: NetName=ADC_SCLK Pin=MD1-44
+Removed Pin From Net: NetName=ADC_MOSI Pin=MD1-46
+Removed Pin From Net: NetName=ADC_CS Pin=MD1-47
+Added Pin To Net: NetName=ADC_SCLK Pin=MD1-23
+Added Pin To Net: NetName=ADC_MOSI Pin=MD1-24
+Added Pin To Net: NetName=ADC_CS Pin=MD1-25
+Added Member To Class: ClassName=Analog Member=Component J1 TMM-103-03-T-S

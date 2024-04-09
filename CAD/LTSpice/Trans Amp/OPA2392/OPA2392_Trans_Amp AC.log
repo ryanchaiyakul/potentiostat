@@ -1,0 +1,4 @@
+Circuit: * C:\Users\12345\Documents\Dev\potentiostat\CAD\LTSpice\Trans Amp\OPA2392\OPA2392_Trans_Amp AC.asc
+
+Fatal Error: Port(pin) count mismatch between the definition of subcircuit "max44280" and instance: "xu1"
+The instance has fewer connection terminals than the definition.

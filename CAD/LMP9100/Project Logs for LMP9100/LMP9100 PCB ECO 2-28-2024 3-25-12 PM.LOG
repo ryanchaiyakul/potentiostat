@@ -1,0 +1,13 @@
+Removed Pin From Net: NetName=AFE_SDA Pin=MD1-6
+Removed Pin From Net: NetName=AFE_SCL Pin=MD1-7
+Removed Pin From Net: NetName=AFE_EN Pin=MD1-8
+Removed Pin From Net: NetName=DAC_SCLK Pin=MD1-39
+Removed Pin From Net: NetName=DAC_CS Pin=MD1-40
+Removed Pin From Net: NetName=DAC_MOSI Pin=MD1-41
+Added Pin To Net: NetName=AFE_SDA Pin=MD1-26
+Added Pin To Net: NetName=AFE_SCL Pin=MD1-27
+Added Pin To Net: NetName=AFE_EN Pin=MD1-29
+Added Pin To Net: NetName=DAC_MOSI Pin=MD1-32
+Added Pin To Net: NetName=DAC_SCLK Pin=MD1-33
+Added Pin To Net: NetName=DAC_CS Pin=MD1-34
+Added Member To Class: ClassName=MCU Member=Component J2 TMM-103-03-T-S

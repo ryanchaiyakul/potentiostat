@@ -30,8 +30,8 @@ Gmin stepping succeeded in finding the operating point.
 .step r=10000 c=5000
 .step r=100000 c=5000
 
-Date: Thu Jan 11 16:44:33 2024
-Total elapsed time: 1.294 seconds.
+Date: Tue Jan 16 15:24:10 2024
+Total elapsed time: 1.267 seconds.
 
 tnom = 27
 temp = 27
@@ -45,6 +45,6 @@ matrix size = 10
 fillins = 2
 solver = Normal
 Avg thread counts: 6.3/0.0/11.1/6.3
-Matrix Compiler1:      29 opcodes  0.4/[0.2]/0.3
-Matrix Compiler2: 876 bytes object code size  0.3/0.4/[0.3]
+Matrix Compiler1:      29 opcodes  0.3/[0.3]/0.3
+Matrix Compiler2: off  [0.2]/0.4/0.3
 

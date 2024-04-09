@@ -1,0 +1,7 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "ADS131M04IRUKR")(type "KiCad")(uri "${KIPRJMOD}/libraries/ul_ADS131M04IRUKR/2024-02-05_21-05-49.kicad_sym")(options "")(descr ""))
+  (lib (name "DAC80502DRXR")(type "KiCad")(uri "${KIPRJMOD}/libraries/ul_DAC80502DRXR/DAC80502DRXR.kicad_sym")(options "")(descr ""))
+  (lib (name "ADS131A04IPBS")(type "KiCad")(uri "${KIPRJMOD}/libraries/ul_ADS131A04IPBS/2024-02-06_02-03-35.kicad_sym")(options "")(descr ""))
+  (lib (name "OPA2328DGKR")(type "KiCad")(uri "${KIPRJMOD}/libraries/ul_POPA2328DGKR/2024-02-06_02-24-36.kicad_sym")(options "")(descr ""))
+)

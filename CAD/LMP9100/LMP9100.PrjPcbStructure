@@ -1,0 +1,3 @@
+Record=TopLevelDocument|FileName=Analog.SchDoc|SheetNumber=1
+Record=NoMainPathDocument|SourceDocument=Analog.SchDoc|FileName=MCU.SchDoc|SheetNumber=2
+Record=NoMainPathDocument|SourceDocument=Analog.SchDoc|FileName=Power.SchDoc|SheetNumber=3

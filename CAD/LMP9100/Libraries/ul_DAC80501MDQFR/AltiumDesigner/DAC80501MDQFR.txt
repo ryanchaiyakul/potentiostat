@@ -1,0 +1,88 @@
+# Created by Ultra Librarian 8.3.350 Copyright © 1999-2024
+# Frank Frank, Accelerated Designs
+
+StartFootprints
+
+Footprint (Name "WSON8_2P1X2P1_TEX")
+Pad (Name "1") (Location -33.4331, 29.5276) (Surface True) (Rotation 0) (ExpandMask 0) (ExpandPaste 0)
+PadShape (Size 36, 10) (Shape Rectangular) (Layer Top)
+EndPad
+Pad (Name "2") (Location -35.4331, 9.8425) (Surface True) (Rotation 0) (ExpandMask 0) (ExpandPaste 0)
+PadShape (Size 32, 10) (Shape Rectangular) (Layer Top)
+EndPad
+Pad (Name "3") (Location -35.4331, -9.8425) (Surface True) (Rotation 0) (ExpandMask 0) (ExpandPaste 0)
+PadShape (Size 32, 10) (Shape Rectangular) (Layer Top)
+EndPad
+Pad (Name "4") (Location -35.4331, -29.5276) (Surface True) (Rotation 0) (ExpandMask 0) (ExpandPaste 0)
+PadShape (Size 32, 10) (Shape Rectangular) (Layer Top)
+EndPad
+Pad (Name "5") (Location 35.4331, -29.5276) (Surface True) (Rotation 180) (ExpandMask 0) (ExpandPaste 0)
+PadShape (Size 32, 10) (Shape Rectangular) (Layer Top)
+EndPad
+Pad (Name "6") (Location 35.4331, -9.8425) (Surface True) (Rotation 180) (ExpandMask 0) (ExpandPaste 0)
+PadShape (Size 32, 10) (Shape Rectangular) (Layer Top)
+EndPad
+Pad (Name "7") (Location 35.4331, 9.8425) (Surface True) (Rotation 180) (ExpandMask 0) (ExpandPaste 0)
+PadShape (Size 32, 10) (Shape Rectangular) (Layer Top)
+EndPad
+Pad (Name "8") (Location 35.4331, 29.5276) (Surface True) (Rotation 180) (ExpandMask 0) (ExpandPaste 0)
+PadShape (Size 32, 10) (Shape Rectangular) (Layer Top)
+EndPad
+Line (Width 6) (Start -61.43307114, -44.52756119) (End -61.43307114, 44.52756119) (Layer Mechanical15) 
+Line (Width 6) (Start -61.43307114, 44.52756119) (End -49.5, 44.52756119) (Layer Mechanical15) 
+Line (Width 6) (Start 61.43307114, 44.52756119) (End 49.5, 44.52756119) (Layer Mechanical15) 
+Line (Width 6) (Start 61.43307114, 44.52756119) (End 61.43307114, -44.52756119) (Layer Mechanical15) 
+Line (Width 6) (Start 61.43307114, -44.52756119) (End 49.5, -44.52756119) (Layer Mechanical15) 
+Line (Width 6) (Start -61.43307114, -44.52756119) (End -49.5, -44.52756119) (Layer Mechanical15) 
+Line (Width 6) (Start -49.5, -49.5) (End -49.5, -44.52756119) (Layer Mechanical15) 
+Line (Width 6) (Start -49.5, 44.52756119) (End -49.5, 49.5) (Layer Mechanical15) 
+Line (Width 6) (Start -49.5, 49.5) (End 49.5, 49.5) (Layer Mechanical15) 
+Line (Width 6) (Start 49.5, 49.5) (End 49.5, 44.52756119) (Layer Mechanical15) 
+Line (Width 6) (Start 49.5, -44.52756119) (End 49.5, -49.5) (Layer Mechanical15) 
+Line (Width 6) (Start 49.5, -49.5) (End -49.5, -49.5) (Layer Mechanical15) 
+Polygon (PointCount 12) (Layer Mechanical15) 
+Point (-61.43307114, -44.52756119)
+Point (-61.43307114, 44.52756119)
+Point (-49.5, 44.52756119)
+Point (-49.5, 49.5)
+Point (49.5, 49.5)
+Point (49.5, 44.52756119)
+Point (61.43307114, 44.52756119)
+Point (61.43307114, -44.52756119)
+Point (49.5, -44.52756119)
+Point (49.5, -49.5)
+Point (-49.5, -49.5)
+Point (-49.5, -44.52756119)
+EndPolygon
+Line (Width 6) (Start -10.9383223, -44.5) (End 10.9383223, -44.5) (Layer TopOverlay) 
+Line (Width 6) (Start 10.9383223, 44.5) (End -6.9383223, 44.5) (Layer TopOverlay) 
+Arc (Width 6) (Radius 3) (Location -65.27558899, 29.52755928) (StartAngle 75.67060089) (EndAngle 284.32939911) (Layer TopOverlay) 
+Line (Width 1) (Start -39.5, -39.5) (End 39.5, -39.5) (Layer Mechanical13) 
+Line (Width 1) (Start 39.5, -39.5) (End 39.5, 39.5) (Layer Mechanical13) 
+Line (Width 1) (Start 39.5, 39.5) (End -39.5, 39.5) (Layer Mechanical13) 
+Line (Width 1) (Start -39.5, 39.5) (End -39.5, -39.5) (Layer Mechanical13) 
+Arc (Width 0) (Radius 3) (Location -19.43306923, 29.52755928) (StartAngle 0) (EndAngle 360) (Layer Mechanical13) 
+Arc (Width 0) (Radius 12) (Location 0, 39.5) (StartAngle 180) (EndAngle 360) (Layer Mechanical13) 
+Step (Name WSON8_2P1X2P1_TEX.step)
+EndFootprint
+EndFootprints
+
+StartComponents
+
+Component (Name "DAC80501MDQFR") (PartCount 1) (DesPrefix "U?")
+Pin (Location 300, 0) (Rotation 180) (PinType Passive) (Length 300) (Width 0) (Designator Visible "6") (Name Visible "*SYNC/A0") (PinSwap 0) (PartSwap 0) (PinSeq 1) (Part 1)
+Pin (Location 300, -100) (Rotation 180) (PinType Passive) (Length 300) (Width 0) (Designator Visible "5") (Name Visible "SCLK/SCL") (PinSwap 0) (PartSwap 0) (PinSeq 2) (Part 1)
+Pin (Location 300, -200) (Rotation 180) (PinType Passive) (Length 300) (Width 0) (Designator Visible "7") (Name Visible "SDIN/SDA") (PinSwap 0) (PartSwap 0) (PinSeq 3) (Part 1)
+Pin (Location 300, -300) (Rotation 180) (PinType Passive) (Length 300) (Width 0) (Designator Visible "4") (Name Visible "SPI2C") (PinSwap 0) (PartSwap 0) (PinSeq 4) (Part 1)
+Pin (Location 300, -600) (Rotation 180) (PinType Power) (Length 300) (Width 0) (Designator Visible "1") (Name Visible "VDD") (PinSwap 0) (PartSwap 0) (PinSeq 5) (Part 1)
+Pin (Location 300, -700) (Rotation 180) (PinType Power) (Length 300) (Width 0) (Designator Visible "8") (Name Visible "VREFIO") (PinSwap 0) (PartSwap 0) (PinSeq 6) (Part 1)
+Pin (Location 300, -900) (Rotation 180) (PinType Power) (Length 300) (Width 0) (Designator Visible "3") (Name Visible "AGND") (PinSwap 0) (PartSwap 0) (PinSeq 7) (Part 1)
+Pin (Location 1700, 100) (Rotation 0) (PinType Output) (Length 300) (Width 0) (Designator Visible "2") (Name Visible "VOUT") (PinSwap 0) (PartSwap 0) (PinSeq 8) (Part 1)
+Rectangle (Width 5) (Start 300, -1100) (End 1700, 300) (Part 1)
+Parameter (Name "Mfr_Name") (Location 0, 0) (Height 50) (Rotation 0) (Justification Center) (Value "Texas Instruments") (Part 1)
+Parameter (Name "RefDes") (Location 1000, 500) (Height 82) (Rotation 0) (Justification Center) (Value "RefDes") (Part 1)
+Parameter (Name "Type") (Location 1000, 400) (Height 82) (Rotation 0) (Justification Center) (Value "Type") (Part 1)
+Description (Value "No Description Available") (Part 1)
+Footprint (Name "WSON8_2P1X2P1_TEX")
+EndComponent
+EndComponents

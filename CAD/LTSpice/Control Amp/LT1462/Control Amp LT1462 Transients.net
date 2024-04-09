@@ -1,0 +1,12 @@
+* C:\Users\12345\Documents\Dev\potentiostat\CAD\LTSpice\Control Amp\LT1462\Control Amp LT1462 Transients.asc
+XU1 DAC_OUT RE 3.3V 0 CE LT1462
+V1 3.3V 0 3.3
+V2 DAC_OUT 0 PWL file=swv.txt
+R1 CE RE {C}
+R2 0 RE {R}
+.step param R list 5000 10000 100000
+.step param C list 1 1000 5000
+.tran 0 9 0 0.01
+.lib LTC.lib
+.backanno
+.end
