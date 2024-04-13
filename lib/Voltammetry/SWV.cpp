@@ -49,7 +49,6 @@ void SWV::reset()
         isForward = startMV < vertexMVs[0] ? true : false;
     }
     baseMV = startMV + (isForward ? incrE : -incrE);
-    prevTime = 0; // initial sets to 0 instead of incrementing
     count = 0;
     state = INI;
 }

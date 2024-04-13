@@ -30,7 +30,6 @@ void DPV::reset()
 {
     Voltammetry::reset();
     baseMV = startMV + incrE;
-    prevTime = 0; // initial sets to 0 instead of incrementing
     state = INI;
 }
 

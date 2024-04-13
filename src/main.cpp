@@ -18,12 +18,12 @@
 #define DOUT 12 // MOSI
 #define SCLK 13 // SCLK
 
-#define REFDACMV 2498
+#define REFDACMV 2499
 #define AMPOFFSET 0
 
-#define MINMV 2000 - REFDACMV // WE-RE lowest voltage
-#define MAXMV 2000            // WE-RE highest voltage
 #define WEMV 1000
+#define MINMV WEMV - REFDACMV // WE-RE lowest voltage
+#define MAXMV WEMV            // WE-RE highest voltage
 
 #define KERNELSIZE 8 // Samples during sample period
 
@@ -83,7 +83,7 @@ unsigned long start_time;
 unsigned count;
 
 ADS1256 adc(CS_adc, RDY);
-//DAC80502 dac(CS_dac, REFDACMV);
+DAC80502 dac(CS_dac, REFDACMV);
 
 DPV dpv(dpvStartMV,
         dpvEndMV,
@@ -159,6 +159,9 @@ void serialCMD(byte cmd)
   case 'v':
   case 'V':
     debug_f = !debug_f;
+    if (debug_f) {
+      Serial.println("Debugging mode enabled");
+    }
     break;
   default:
     break;
@@ -168,14 +171,11 @@ void serialCMD(byte cmd)
 void setup()
 {
   Serial.begin(BAUD_RATE);
-  pinMode(CS_dac, OUTPUT);
-  //dac.init();
+  dac.init();
   // TODO: Add synchronized setB/setA to prevent the cell from excessive voltage at startup
-  //dac.setB(WEMV / 1000.0); // Bias point
-  //dac.setA(WEMV / 1000.0);
+  dac.setB(WEMV / 1000.0); // Bias point
+  dac.setA(WEMV / 1000.0);
   adc.init();
-
-  SPI.begin();
 
   // Default DPV
   selectDPV();
@@ -199,12 +199,12 @@ void potentiostatMain() {
       break;
     case SHIFTV:
       //Serial.println((WEMV - method->getVoltage()) / 1000.0 - AMPOFFSET);
-      //dac.setA((WEMV - method->getVoltage()) / 1000.0 - AMPOFFSET);
+      dac.setA((WEMV - method->getVoltage()) / 1000.0 - AMPOFFSET);
       break;
     case SAMPLE:
-      while (i++ < KERNELSIZE) {
-        Serial.println(adc.readSingle() & ((int32_t) 0xFFFFFF00));
-      }
+      //while (i++ < KERNELSIZE) {
+      //  Serial.println(adc.readSingle() & ((int32_t) 0xFFFFFF00));
+      //}
       i = 0;
       break;
     case DONE:
@@ -245,23 +245,12 @@ void potentiostatMain() {
 void test() {
   Serial.println("1.0");
   //dac.setA(1.0);
-  //dac.setB(1.4);
+  dac.setB(0.0);
   delay(1000);
   Serial.println("1.4");
   //dac.setA(1.4);
-  //dac.setB(1.0);
+  dac.setB(0.005);
   delay(1000);
-}
-
-void test_manual(uint8_t value) {
-  SPI.beginTransaction(SPISettings(200000, MSBFIRST, SPI_MODE2));
-  digitalWrite(CS_dac, LOW);
-  delayMicroseconds(5);
-  SPI.transfer(0x08);
-  SPI.transfer(value); //0x7FFF
-  SPI.transfer(0xFF);
-  digitalWrite(CS_dac, HIGH);
-  SPI.endTransaction();
 }
 
 /**
@@ -271,10 +260,6 @@ void test_manual(uint8_t value) {
 */
 void loop()
 {
-  test_manual(0x7F);
-  //test();
-  //dac.setA(1.0);
-  //dac.setB(1.0);
-  //potentiostatMain();
+  potentiostatMain();
 }
 

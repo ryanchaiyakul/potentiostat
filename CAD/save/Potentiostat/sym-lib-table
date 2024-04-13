@@ -1,7 +1,0 @@
-(sym_lib_table
-  (version 7)
-  (lib (name "ADS127L11IRUKR")(type "KiCad")(uri "${KIPRJMOD}/libraries/ADS127L11IRUKR/ADS127L11IRUKR.kicad_sym")(options "")(descr ""))
-  (lib (name "DAC80502DRXR")(type "KiCad")(uri "${KIPRJMOD}/libraries/ul_DAC80502DRXR/DAC80502DRXR.kicad_sym")(options "")(descr ""))
-  (lib (name "OPA2328DGKR")(type "KiCad")(uri "${KIPRJMOD}/libraries/ul_POPA2328DGKR/2024-02-01_22-19-14.kicad_sym")(options "")(descr ""))
-  (lib (name "MCU_RaspberryPi_and_Boards")(type "KiCad")(uri "${KIPRJMOD}/libraries/Pico/MCU_RaspberryPi_and_Boards.kicad_sym")(options "")(descr ""))
-)

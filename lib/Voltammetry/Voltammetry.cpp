@@ -21,15 +21,12 @@ Voltammetry::Voltammetry(int quietMV,
  */
 void Voltammetry::reset()
 {
+    activeTime = getActiveTime();
     state = internState::IDLE;
     iniTime = micros();
+    prevTime = 0;
     mv = 0;
-
-    // reset actionQueue and set nextAction to a valid value
     actionQueue.clear();
-    nextAction = calculateAction();
-    actionQueue.push(calculateAction());
-    activeTime = getActiveTime();
 }
 
 int Voltammetry::getVoltage()
@@ -44,6 +41,8 @@ UpdateStatus Voltammetry::update()
     {
     case IDLE:
         // IDLE immediately transitions to quiet on first call
+        nextAction = calculateAction();
+        actionQueue.push(calculateAction());   
         setVoltage(quietMV);
         state = internState::QUIET;
         iniTime = micros(); // Update iniTime in case reset() and first update is far apart

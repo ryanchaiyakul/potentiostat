@@ -6,7 +6,25 @@ I2BL potentiostat library and project.
 
 # Goals
 
-Create a library to easily program simple potentiostats for various voltammetry methods.
+1. Create a library to easily program simple potentiostats for various voltammetry methods.
+2. Create a collection of tools to develop future potentiostats.
+3. Create a simulation suite to visualize and validate design decisions.
+
+# Simulations
+
+Go to the [README.md](CAD/LTSpice/README.md) in CAD/LTSpice folder.
+
+# Tools
+
+Go to the tools folder for a complete collection.
+
+## CPE Models
+
+Generate RC Train models of CPE elements to simulate how the readout circuit responds.
+
+## PWL Voltammetry
+
+Generate PWL files to pass into a voltage source to act as the DAC.
 
 # Usage
 
@@ -25,12 +43,12 @@ git clone --recurse-submodules git@github.com:ryanchaiyakul/potentiostat.git
 - [x] Differential Pulse Voltammetry
 - [x] Square Wave Voltammetry
 - [ ] Cyclic Voltammetry
-- [ ] 300+ Hz SWV (?)
+- [x] 300+ Hz SWV
 - [ ] OTA Configuration
 - [ ] EEPROM Persistent Configuration
 - [ ] BLE Integration
 - [x] Simple "Debug" Mode
-- [ ] Complete Analytics in "Debug" Mode
+- [x] Complete Analytics in "Debug" Mode
 - [ ] Unit Testing Suite
 
 # Development Guide

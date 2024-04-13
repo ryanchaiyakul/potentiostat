@@ -63,6 +63,7 @@ protected:
     virtual Action calculateAction() = 0;
     unsigned long getTime();
     void setVoltage(int);
+    unsigned long prevTime;
 
 private:
     enum internState

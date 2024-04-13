@@ -2,7 +2,7 @@
 #define DAC80502_H
 #include <Arduino.h>
 // SPI Hz
-#define DAC80502_SPEED 200000
+#define DAC80502_SPEED 2000000
 
 // DAC Registers
 #define DAC80502_CONFIG 0x03

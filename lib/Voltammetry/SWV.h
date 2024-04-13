@@ -48,7 +48,6 @@ private:
         HIGH_V,
         HIGH_S
     } state;
-    unsigned long prevTime;
     unsigned long VtoS;
 };
 
