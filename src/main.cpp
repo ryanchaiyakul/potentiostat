@@ -2,10 +2,13 @@
 #include <SPI.h>
 
 #include <ADS1256.h>
+#include <ADS131A04.h>
 #include <DAC8552.h>
 #include <DAC80502.h>
 #include <DPV.h>
 #include <SWV.h>
+
+#include <LMP91000.h>
 
 // Baud Rate
 #define BAUD_RATE 230400 // 115200 or 230400 for DPV
@@ -13,6 +16,7 @@
 // Pinout
 #define RDY 3
 #define CS_adc 8
+#define DRDY 9
 #define CS_dac 10
 #define DIN 11  // MISO
 #define DOUT 12 // MOSI
@@ -82,8 +86,10 @@ bool debug_f = false;
 unsigned long start_time;
 unsigned count;
 
-ADS1256 adc(CS_adc, RDY);
+ADS131A04 adc(CS_adc, DRDY);
 DAC80502 dac(CS_dac, REFDACMV);
+
+LMP91000 lmp;
 
 DPV dpv(dpvStartMV,
         dpvEndMV,
@@ -136,7 +142,7 @@ void serialCMD(byte cmd)
     else
     {
       state = EXP_MODE;
-      adc.printCallibration();
+      //adc.printCallibration();
     }
     i = 0;
     method->reset();
@@ -200,7 +206,7 @@ void potentiostatMain() {
     case SHIFTV:
       //Serial.println((WEMV - method->getVoltage()) / 1000.0 - AMPOFFSET);
       dac.setA((WEMV - method->getVoltage()) / 1000.0 - AMPOFFSET);
-      break;
+      break;  
     case SAMPLE:
       //while (i++ < KERNELSIZE) {
       //  Serial.println(adc.readSingle() & ((int32_t) 0xFFFFFF00));
@@ -260,6 +266,10 @@ void test() {
 */
 void loop()
 {
-  potentiostatMain();
+  VBiasPair a = lmp.calculateVBiasPair(600);
+  Serial.println(a.mV);
+  Serial.println(a.bias);
+  Serial.println(a.mV * TIA_BIAS[a.bias]);
+  delay(1000);
 }
 

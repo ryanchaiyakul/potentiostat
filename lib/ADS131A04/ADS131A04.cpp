@@ -3,9 +3,21 @@
 #include <ADS131A04.h>
 
 // TODO: Consider SPI
-ADS131A04::ADS131A04(uint8_t cs)
+ADS131A04::ADS131A04(uint8_t cs, uint8_t drdy)
 {
     this->cs = cs;
+    this->drdy = drdy;
+}
+
+void ADS131A04::init() {
+    pinMode(cs, OUTPUT);
+    digitalWrite(cs, HIGH);
+    pinMode(drdy, OUTPUT);
+    digitalWrite(drdy, HIGH);
+}
+
+void ADS131A04::callibrate() {
+    
 }
 
 /**
@@ -24,12 +36,14 @@ uint16_t ADS131A04::callCMD(uint16_t cmd)
  */
 uint16_t ADS131A04::writeCMD(uint16_t cmd)
 {
+    digitalWrite(drdy, LOW);
     SPI.beginTransaction(SPISettings(ADS131A04_HZ, MSBFIRST, SPI_MODE1));
     digitalWrite(cs, LOW);
     uint16_t bfr = SPI.transfer16(cmd);
     digitalWrite(cs, HIGH);
     // TODO: Figure out if all remaining bits have to cycle
     SPI.endTransaction();
+    digitalWrite(drdy, HIGH);
     return bfr;
 }
 
@@ -60,7 +74,7 @@ void ADS131A04::enable()
 /**
  * Disable all channels
  */
-void ADS131A04::enable()
+void ADS131A04::disable()
 {
     writeReg(ADS131A04_ADC_ENA, 0b0000); // pg. 69
 }

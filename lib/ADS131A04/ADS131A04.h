@@ -2,7 +2,7 @@
 #define ADS131A04_H
 #include <Arduino.h>
 // SPI Hz
-#define ADS131A04_HZ 2000000
+#define ADS131A04_HZ 10000
 
 // System Commands
 #define ADS131A04_CMD_NULL      0x0000
@@ -55,17 +55,19 @@
 class ADS131A04
 {
 public:
-    ADS131A04(uint8_t);
+    ADS131A04(uint8_t, uint8_t);
+    void init();
+    void callibrate();
     uint16_t readReg(uint16_t);
     uint16_t writeReg(uint16_t, uint16_t);
+    uint16_t callCMD(uint16_t);
+    uint16_t writeCMD(uint16_t);
     void enable();
     void disable();
     void setGain(uint8_t, uint16_t);
     uint16_t* readChannels();
 private:
-    uint16_t callCMD(uint16_t);
-    uint16_t writeCMD(uint16_t);
-    uint8_t cs;
+    uint8_t cs, drdy;
 };
 
 #endif
