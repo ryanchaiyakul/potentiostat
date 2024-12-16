@@ -42,7 +42,7 @@ UpdateStatus Voltammetry::update()
     case IDLE:
         // IDLE immediately transitions to quiet on first call
         nextAction = calculateAction();
-        actionQueue.push(calculateAction());   
+        actionQueue.push(calculateAction());
         setVoltage(quietMV);
         state = internState::QUIET;
         iniTime = micros(); // Update iniTime in case reset() and first update is far apart

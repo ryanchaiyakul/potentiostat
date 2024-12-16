@@ -25,7 +25,7 @@
 #define REFDACMV 2499
 #define AMPOFFSET 0
 
-#define WEMV 1000
+#define WEMV 1800
 #define MINMV WEMV - REFDACMV // WE-RE lowest voltage
 #define MAXMV WEMV            // WE-RE highest voltage
 
@@ -61,7 +61,7 @@ unsigned long dpvSamplingOffsetUS = 1670;
 // SWV Settings
 
 // All in mV
-int swvStartMV = -100;
+int swvStartMV = -50;
 int swvVerticesMVs[4] = {0}; // up to 4 vertices
 int swvEndMV = -450;
 int swvIncrE = 1;
@@ -79,7 +79,9 @@ unsigned long swvSamplingOffsetUS = 1000;
 int8_t state = 0;
 Voltammetry *method;
 UpdateStatus status;
-int i; // tracks which sample has been sent
+double mv[2];
+bool high_low = true;  // false on low cycle
+bool is_ready = false;
 
 // Debug
 bool debug_f = false;
@@ -88,8 +90,6 @@ unsigned count;
 
 ADS131A04 adc(CS_adc, DRDY);
 DAC80502 dac(CS_dac, REFDACMV);
-
-LMP91000 lmp;
 
 DPV dpv(dpvStartMV,
         dpvEndMV,
@@ -144,7 +144,7 @@ void serialCMD(byte cmd)
       state = EXP_MODE;
       //adc.printCallibration();
     }
-    i = 0;
+    high_low = true;
     method->reset();
     break;
   // DPV mode
@@ -179,8 +179,8 @@ void setup()
   Serial.begin(BAUD_RATE);
   dac.init();
   // TODO: Add synchronized setB/setA to prevent the cell from excessive voltage at startup
-  dac.setB(WEMV / 1000.0); // Bias point
-  dac.setA(WEMV / 1000.0);
+  dac.setB(WEMV); // Bias point
+  dac.setA(WEMV);
   adc.init();
 
   // Default DPV
@@ -202,16 +202,23 @@ void potentiostatMain() {
     {
     case NONE:
       // TODO: Implement working burst mode
+      if (is_ready) {
+        Serial.println(mv[0] - mv[1]);
+        is_ready = false;
+      }
       break;
     case SHIFTV:
-      //Serial.println((WEMV - method->getVoltage()) / 1000.0 - AMPOFFSET);
-      dac.setA((WEMV - method->getVoltage()) / 1000.0 - AMPOFFSET);
+      dac.setA(WEMV - method->getVoltage());
       break;  
     case SAMPLE:
-      //while (i++ < KERNELSIZE) {
-      //  Serial.println(adc.readSingle() & ((int32_t) 0xFFFFFF00));
-      //}
-      i = 0;
+      if (high_low) {
+        mv[0] = analogRead(A3) * (5.0 / 1024.0);
+      }
+      else {
+        mv[1] = analogRead(A3) * (5.0 / 1024.0);
+        is_ready = true;
+      }
+      high_low = !high_low;
       break;
     case DONE:
       // Send last sample if there was not time to send it
@@ -250,12 +257,10 @@ void potentiostatMain() {
 
 void test() {
   Serial.println("1.0");
-  //dac.setA(1.0);
-  dac.setB(0.0);
+  dac.setA(1.0);
   delay(1000);
   Serial.println("1.4");
-  //dac.setA(1.4);
-  dac.setB(0.005);
+  dac.setA(1.4);
   delay(1000);
 }
 
@@ -266,10 +271,10 @@ void test() {
 */
 void loop()
 {
-  VBiasPair a = lmp.calculateVBiasPair(600);
-  Serial.println(a.mV);
-  Serial.println(a.bias);
-  Serial.println(a.mV * TIA_BIAS[a.bias]);
-  delay(1000);
+  //Serial.println(adc.readReg(0x07));
+  //delay(1000);
+  potentiostatMain();
+  //Serial.println(analogRead(A3) * (5.0 / 1024.0), 4);
+  //delay(50);
 }
 

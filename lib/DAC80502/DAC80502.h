@@ -20,13 +20,13 @@ class DAC80502 {
     public:
         DAC80502(uint8_t, uint16_t);
         void init();
-        void setA(float);
-        void setB(float);
-        void setAandB(float, float);
+        void setA(uint16_t);
+        void setB(uint16_t);
+        void setAandB(uint16_t, uint16_t);
     private:
         void DAC_WR(byte, uint16_t);
         void syncDAC(bool);
-        uint16_t Voltage_Convert(float);
+        uint16_t Voltage_Convert(uint16_t);
         bool sync;
         uint16_t refV;
         uint8_t cs;

@@ -29,7 +29,7 @@ void DAC80502::init()
  * Set Channel A to requested voltage
  * If outside of reference range, sets to 0V
  */
-void DAC80502::setA(float voltage)
+void DAC80502::setA(uint16_t voltage)
 {
   uint16_t data = Voltage_Convert(voltage);
   DAC_WR(DAC80502_A, data);
@@ -39,7 +39,7 @@ void DAC80502::setA(float voltage)
  * Set Channel B to requested voltage
  * If outside of reference range, sets to 0V
  */
-void DAC80502::setB(float voltage)
+void DAC80502::setB(uint16_t voltage)
 {
   uint16_t data = Voltage_Convert(voltage);
   DAC_WR(DAC80502_B, data);
@@ -48,7 +48,7 @@ void DAC80502::setB(float voltage)
 /**
  * Synchronizes and sets A and B then unsynchronizes
 */
-void DAC80502::setAandB(float a_voltage, float b_voltage)
+void DAC80502::setAandB(uint16_t a_voltage, uint16_t b_voltage)
 {
   syncDAC(true);
   setA(a_voltage);
@@ -82,10 +82,10 @@ void DAC80502::DAC_WR(byte command, uint16_t data)
   SPI.endTransaction();
 }
 
-uint16_t DAC80502::Voltage_Convert(float voltage)
+uint16_t DAC80502::Voltage_Convert(uint16_t voltage)
 {
-  if (abs(voltage * 1000) > refV * gain)
+  if (voltage > refV * gain)
     return 0;
   // DAC_DATA = V_OUT * 2**(16) / (VREFIO * GAIN)
-  return (unsigned int)(65536 * (voltage * 1000) / (refV * gain));
+  return (unsigned int)(65536 * voltage / (refV * gain));
 }

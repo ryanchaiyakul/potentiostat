@@ -2,7 +2,7 @@
 #define ADS131A04_H
 #include <Arduino.h>
 // SPI Hz
-#define ADS131A04_HZ 10000
+#define ADS131A04_HZ 100000
 
 // System Commands
 #define ADS131A04_CMD_NULL      0x0000
